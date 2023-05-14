@@ -21,5 +21,6 @@ Depends:
     tibble,
     data.table,
     ggplot2,
+    ggiraph,
     viridis,
     grid
