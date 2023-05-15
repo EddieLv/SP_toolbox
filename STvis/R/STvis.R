@@ -209,12 +209,12 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
                                         column(width = 4,
                                                selectInput(inputId = "shapeInput", label = "Select shape", choices = c(22), selected = 22, width = "100%")),
                                         column(width = 4,
-                                               selectInput(inputId = "featureInput", label = "Select feature", choices = c("sample"), selected = "sample", width = "100%"))), shiny::hr(),
+                                               selectInput(inputId = "featureInput", label = "Select feature", choices = c("orig.ident"), selected = "orig.ident", width = "100%"))), shiny::hr(),
 
                                       fluidRow(
                                         tags$div(
                                           style = "display: flex; align-items: center;",
-                                          selectInput(inputId = "subsetFeature", label = "Select feature to subset", choices = c("sample"), selected = "sample", width = "40%"),
+                                          selectInput(inputId = "subsetFeature", label = "Select feature to subset", choices = c("orig.ident"), selected = "orig.ident", width = "40%"),
                                           textInput(inputId = "subsetString", label = "Select specific features based on selected feature.\ne.g. [typeA,typeB]", value = "", width = "40%"),
                                           actionButton(inputId = "subset.ok", label = "Select", width = "10%")),
                                         tags$div(
@@ -298,16 +298,21 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
   server = function(input, output, session) {
     options(shiny.maxRequestSize = 100*1024^2)
 
+    if (sum(str_detect(colnames(seurat), "x")) < seurat[2]) {
+      stop("Your cell name must be formatted like 1x1, 1x2 ...")
+    }
+    seurat$barcodeB = str_split(colnames(seurat), "x", simplify = T)[ , 1]
+    seurat$barcodeA = str_split(colnames(seurat), "x", simplify = T)[ , 2]
     seurat$id = 1:dim(seurat)[2]
 
-    sampleChoice = unique(seurat$sample)
+    sampleChoice = unique(seurat$orig.ident)
     shapeChoice = c(22, 21)
     featureChoice = colnames(seurat@meta.data)
 
     updateSelectInput(session, inputId = "sampleInput", label = "Select sample", choices = sampleChoice, selected = sampleChoice[1])
     updateSelectInput(session, inputId = "shapeInput", label = "Select shape", choices = shapeChoice, selected = 22)
-    updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = featureChoice, selected = "sample")
-    updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = featureChoice, selected = "sample")
+    updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = featureChoice, selected = "orig.ident")
+    updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = featureChoice, selected = "orig.ident")
 
     df = reactiveValues()
     df.backup = reactiveValues()
@@ -327,7 +332,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
       df.backup[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% paste0(df.backup$barcodeB, "x", df.backup$barcodeA)]
       df[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% paste0(df$barcodeB, "x", df$barcodeA)]
       updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = names(df), selected = input$geneInput)
-      updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = names(df), selected = "sample")
+      updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = names(df), selected = "orig.ident")
     })
 
     observeEvent(input$subset.ok, {
@@ -384,7 +389,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
                    {
                      df.tmp = as.data.frame(reactiveValuesToList(df))
                      x = ggiraph::girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10,
-                                                                         shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "sample", input$featureInput)),
+                                                                         shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "orig.ident", input$featureInput)),
                                          width_svg = 12, height_svg = 10)
                      x = ggiraph::girafe_options(x, ggiraph::opts_zoom(max = 6),
                                                  ggiraph::opts_selection(type = "multiple", css = "fill:transparent;stroke:transparent;opacity:0.7;"))
