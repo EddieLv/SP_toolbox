@@ -2,7 +2,7 @@
 install via:<br>
 devtools::install_github("EddieLv/STvis/STvis")
 
-###########################################Tutorial###########################################
-library(STvis)
-shiny_st()
+###########################################Tutorial###########################################<br>
+library(STvis)<br>
+shiny_st()<br>
 
