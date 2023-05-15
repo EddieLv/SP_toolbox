@@ -22,5 +22,6 @@ Depends:
     data.table,
     ggplot2,
     ggiraph,
+    stringr,
     viridis,
     grid
