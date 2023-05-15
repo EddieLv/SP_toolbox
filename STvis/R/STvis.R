@@ -154,6 +154,9 @@ make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.s
 
   coordinates = coordinates[paste0(anno.df$barcodeB, "x", anno.df$barcodeA), ]
   coordinates$feature = anno.df[[show.feature]]
+  if (is.character(coordinates$feature)) {
+    coordinates$feature = factor(as.character(coordinates$feature), levels = str_sort(unique(as.character(coordinates$feature)), numeric = T))
+  }
 
   if (is.numeric(coordinates$feature)) {
     cols = viridis(100, option = "D")
@@ -332,7 +335,7 @@ server = function(input, output, session) {
     seurat$id = 1:dim(seurat)[2]
     for (i in colnames(seurat@meta.data)) {
       if (startsWith(i, "SCT_snn") | i == "seurat_clusters") {
-        seurat@meta.data[[i]] = factor(as.character(seurat@meta.data[[i]]), levels = str_sort(unique(as.character(seurat@meta.data[[i]])), numeric = T))
+        seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
       }
     }
 
