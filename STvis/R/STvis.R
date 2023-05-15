@@ -1,18 +1,3 @@
-# Hello, world!
-#
-# This is an example function named 'hello'
-# which prints 'Hello, world!'.
-#
-# You can learn more about package authoring with RStudio at:
-#
-#   http://r-pkgs.had.co.nz/
-#
-# Some useful keyboard shortcuts for package authoring:
-#
-#   Install Package:           'Ctrl + Shift + B'
-#   Check Package:             'Ctrl + Shift + E'
-#   Test Package:              'Ctrl + Shift + T'
-
 library(magick)
 library(shiny)
 library(shinydashboard)
@@ -233,12 +218,12 @@ ui = dashboardPage(dashboardHeader(title = tags$div(style = "white-space: pre-wr
                                       column(width = 4,
                                              selectInput(inputId = "shapeInput", label = "Select shape", choices = c(22), selected = 22, width = "100%")),
                                       column(width = 4,
-                                             selectInput(inputId = "featureInput", label = "Select feature", choices = c("labels"), selected = "labels", width = "100%"))), shiny::hr(),
+                                             selectInput(inputId = "featureInput", label = "Select feature", choices = c("sample"), selected = "sample", width = "100%"))), shiny::hr(),
 
                                     fluidRow(
                                       tags$div(
                                         style = "display: flex; align-items: center;",
-                                        selectInput(inputId = "subsetFeature", label = "Select feature to subset", choices = c("labels"), selected = "labels", width = "40%"),
+                                        selectInput(inputId = "subsetFeature", label = "Select feature to subset", choices = c("sample"), selected = "sample", width = "40%"),
                                         textInput(inputId = "subsetString", label = "Select specific features based on selected feature.\ne.g. [typeA,typeB]", value = "", width = "40%"),
                                         actionButton(inputId = "subset.ok", label = "Select", width = "10%")),
                                       tags$div(
@@ -343,6 +328,8 @@ server = function(input, output, session) {
 
     meta.df = read.csv(inFile$datapath, row.names = 1)
     seurat = create.seurat.shiny(meta.df, spatial_img = inImg$datapath)
+    # id = 1:dim(seurat)[1]; names(id) = rownames(seurat@meta.data)
+    seurat$id = 1:dim(seurat)[2]
 
     sampleChoice = unique(seurat$sample)
     shapeChoice = c(22, 21)
@@ -350,8 +337,8 @@ server = function(input, output, session) {
 
     updateSelectInput(session, inputId = "sampleInput", label = "Select sample", choices = sampleChoice, selected = sampleChoice[1])
     updateSelectInput(session, inputId = "shapeInput", label = "Select shape", choices = shapeChoice, selected = 22)
-    updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = featureChoice, selected = "labels")
-    updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = featureChoice, selected = "labels")
+    updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = featureChoice, selected = "sample")
+    updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = featureChoice, selected = "sample")
 
     df = reactiveValues()
     df.backup = reactiveValues()
@@ -372,7 +359,7 @@ server = function(input, output, session) {
       df.backup[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% paste0(df.backup$barcodeB, "x", df.backup$barcodeA)]
       df[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% paste0(df$barcodeB, "x", df$barcodeA)]
       updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = names(df), selected = input$geneInput)
-      updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = names(df), selected = "labels")
+      updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = names(df), selected = "sample")
     })
 
     observeEvent(input$subset.ok, {
@@ -422,7 +409,7 @@ server = function(input, output, session) {
                    {
                      df.tmp = as.data.frame(reactiveValuesToList(df))
                      x = ggiraph::girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10,
-                                                                         shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "labels", input$featureInput)),
+                                                                         shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "sample", input$featureInput)),
                                          width_svg = 12, height_svg = 10)
                      x = ggiraph::girafe_options(x, ggiraph::opts_zoom(max = 6),
                                                  ggiraph::opts_selection(type = "multiple", css = "fill:transparent;stroke:transparent;opacity:0.7;"))
@@ -463,7 +450,7 @@ server = function(input, output, session) {
                                "If encountered with bug, please contact with wechat <13958598285><br>",
                                "Attention: currently only supports for one sample!<br>",
                                "----------------------------------------------------------------------------------------------------------------<br>",
-                               "下面是输入的示例表格, 必须包含[id, barcodeB, barcodeA, sample, labels]这5列,<br>",
+                               "下面是输入的示例表格, 必须包含[barcodeB, barcodeA, sample]这3列,<br>",
                                "并且行名(row.names)必须和[barcodeB, barcodeA]对应, 你可以添加其他任意列(基因表达、注释等)以可视化<br>",
                                "图片必须是1080p x 1080p的png格式<br>",
                                "----------------------------------------------------------------------------------------------------------------<br>",
@@ -472,7 +459,10 @@ server = function(input, output, session) {
                                "3. 拉索选择完成后, 该区域内的点将消失, 意味着点已经被选中<br>",
                                "4. 在[Set label for selected spots]中输入你想要给被选中点的名字, 点击confirm确认修改<br>",
                                "5. 等待图片更新后, 你可以重复上述操作, 继续选择感兴趣的区域<br>",
-                               "6. 最后点击[Download metadata], 可以生成储存了修改后(上述选择并重命名的信息储存在label列)的metadata.shiny.csv"),
+                               "6. 最后点击[Download metadata], 可以生成储存了修改后(上述选择并重命名的信息储存在label列)的metadata.shiny.csv<br>",
+                               "----------------------------------------------------------------------------------------------------------------<br>",
+                               "*不建议传入整个表达矩阵至云端, 可以先使用脚本制作一个仅包含感兴趣基因的表达矩阵<br>",
+                               "*若有需求, 可以安装本地包, 请查看https://github.com/EddieLv/STvis"),
                           renderDataTable({datatable(read.csv("metadata.test.csv", row.names = 1))}, options = list(pageLength = 5)),
                           size = "l",
                           easyClose = TRUE,
@@ -482,6 +472,5 @@ server = function(input, output, session) {
 }
 
 shiny_st = function() {
-  runApp(list(ui = ui, server = server), launch.browser = T)
+  runApp(list(ui = ui, server = server), launch.browser = getOption("shiny.launch.browser", interactive()))
 }
-
