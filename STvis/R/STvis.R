@@ -330,6 +330,11 @@ server = function(input, output, session) {
     seurat = create.seurat.shiny(meta.df, spatial_img = inImg$datapath)
     # id = 1:dim(seurat)[1]; names(id) = rownames(seurat@meta.data)
     seurat$id = 1:dim(seurat)[2]
+    for (i in colnames(seurat@meta.data)) {
+      if (startsWith(i, "SCT_snn") | i == "seurat_clusters") {
+        seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
+      }
+    }
 
     sampleChoice = unique(seurat$sample)
     shapeChoice = c(22, 21)
