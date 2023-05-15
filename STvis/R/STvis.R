@@ -298,7 +298,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
   server = function(input, output, session) {
     options(shiny.maxRequestSize = 100*1024^2)
 
-    if (sum(str_detect(colnames(seurat), "x")) < seurat[2]) {
+    if (sum(str_detect(colnames(seurat), "x")) < dim(seurat)[2]) {
       stop("Your cell name must be formatted like 1x1, 1x2 ...")
     }
     seurat$barcodeB = str_split(colnames(seurat), "x", simplify = T)[ , 1]
