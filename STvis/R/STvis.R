@@ -332,7 +332,7 @@ server = function(input, output, session) {
     seurat$id = 1:dim(seurat)[2]
     for (i in colnames(seurat@meta.data)) {
       if (startsWith(i, "SCT_snn") | i == "seurat_clusters") {
-        seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
+        seurat@meta.data[[i]] = factor(as.character(seurat@meta.data[[i]]), levels = str_sort(unique(as.character(seurat@meta.data[[i]])), numeric = T))
       }
     }
 
