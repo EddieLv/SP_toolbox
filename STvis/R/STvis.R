@@ -203,7 +203,7 @@ add_image = function (seurat) {
 }
 
 ui = dashboardPage(dashboardHeader(title = tags$div(style = "white-space: pre-wrap; word-wrap: break-word; line-height: 1.2;",
-                                                    "Chen LAB --- ST Tool (v1.0.0)\n---please watch the [Instructions] first---"), titleWidth = 450),
+                                                    "ST Visualization Tool (STvis v1.0.0)\n---please watch the [Instructions] first---"), titleWidth = 450),
                    dashboardSidebar(width = 600,
                                     actionButton(inputId = "info", label = "Instructions"), shiny::hr(),
                                     fluidRow(
