@@ -1,3 +1,3 @@
 # STvis
-install via:
-devtools::install_github("https://github.com/EddieLv/STvis/STvis")
+install via:<br>
+devtools::install_github("EddieLv/STvis/STvis")
