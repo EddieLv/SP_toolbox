@@ -184,6 +184,8 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
     coordinates = GetTissueCoordinates(seurat, image = image) %>%
       mutate(x = imagerow * seurat@images[[image]]@scale.factors$lowres,
              y = imagecol * seurat@images[[image]]@scale.factors$lowres)
+    coordinates = rotate.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), angle = 90)
+    coordinates = flip.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), horizontal = T)
     coordinates$id = seurat$id
 
     img = seurat@images[[image]]@image
@@ -197,11 +199,6 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
                                                       "ST Visualization Tool (STvis v1.0.0)\n---please watch the [Instructions] first---"), titleWidth = 450),
                      dashboardSidebar(width = 600,
                                       actionButton(inputId = "info", label = "Instructions"), shiny::hr(),
-                                      fluidRow(
-                                        column(width = 6,
-                                               fileInput(inputId = "imageInput", label = "1.Input your image file", accept = ".png", placeholder = "*.png")),
-                                        column(width = 6,
-                                               fileInput(inputId = "metaInput", label = "2.Input your metadata file", accept = ".csv", placeholder = "*.csv"))),
 
                                       fluidRow(
                                         column(width = 4,
@@ -219,7 +216,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
                                           actionButton(inputId = "subset.ok", label = "Select", width = "10%")),
                                         tags$div(
                                           style = "display: flex; align-items: center;",
-                                          actionButton(inputId = "recover.ok", label = "Recover to origin (all changes will be reset!)", width = "50%"))), shiny::hr(),
+                                          actionButton(inputId = "recover.ok", label = "Back to all celltypes!)", width = "50%"))), shiny::hr(),
 
                                       fluidRow(
                                         column(width = 6,
@@ -272,7 +269,6 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
 
                                       tags$div(
                                         style = "display: flex; align-items: center;",
-                                        fileInput(inputId = "matInput", label = "***Input your expression matrix", accept = ".csv", placeholder = "*.csv"),
                                         textInput(inputId = "geneInput", label = "Select one gene to visualize", value = ""),
                                         actionButton(inputId = "gene.ok", label = "√")
                                       ), shiny::hr(),
@@ -283,8 +279,6 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
                                         actionButton(inputId = "confirm", label = "Confirm")), shiny::hr(),
 
                                       tags$div(
-                                        column(width = 6,
-                                               downloadButton(outputId = "downloadData", label = "Download metadata")),
                                         column(width = 6,
                                                actionButton(inputId = "stopApp", label = "Quit")))),
                      dashboardBody(ggiraph::girafeOutput("Plot1", width = "100%", height = paste0(1080, "px"))),
@@ -301,13 +295,14 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
     if (sum(str_detect(colnames(seurat), "x")) < dim(seurat)[2]) {
       stop("Your cell name must be formatted like 1x1, 1x2 ...")
     }
-    seurat$barcodeB = str_split(colnames(seurat), "x", simplify = T)[ , 1]
-    seurat$barcodeA = str_split(colnames(seurat), "x", simplify = T)[ , 2]
-    seurat$id = 1:dim(seurat)[2]
 
     sampleChoice = unique(seurat$orig.ident)
     shapeChoice = c(22, 21)
     featureChoice = colnames(seurat@meta.data)
+    # add important feature!
+    seurat$barcodeB = str_split(colnames(seurat), "x", simplify = T)[ , 1]
+    seurat$barcodeA = str_split(colnames(seurat), "x", simplify = T)[ , 2]
+    seurat$id = 1:dim(seurat)[2]
 
     updateSelectInput(session, inputId = "sampleInput", label = "Select sample", choices = sampleChoice, selected = sampleChoice[1])
     updateSelectInput(session, inputId = "shapeInput", label = "Select shape", choices = shapeChoice, selected = 22)
@@ -337,11 +332,15 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
 
     observeEvent(input$subset.ok, {
       subset.features = strsplit(input$subsetString, split = ",")[[1]]
+
       if (all(subset.features %in% df[[input$subsetFeature]])) {
         for (i in names(df)[names(df) != input$subsetFeature]) {
           df[[i]] = df[[i]][df[[input$subsetFeature]] %in% subset.features]
         }
         df[[input$subsetFeature]] = df[[input$subsetFeature]][df[[input$subsetFeature]] %in% subset.features]
+        if (is.factor(df[[input$subsetFeature]])) {
+          df[[input$subsetFeature]] = droplevels(df[[input$subsetFeature]])
+        }
       } else {
         for (i in names(df)[names(df) != input$subsetFeature]) {
           df[[i]] = df.backup[[i]][df.backup[[input$subsetFeature]] %in% subset.features]
@@ -403,9 +402,16 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
         levs = levels(df[[input$featureInput]])
         df[[input$featureInput]] = as.character(df[[input$featureInput]])
         df[[input$featureInput]][which(df$id %in% ids.selected)] = input$labelInput
-        df[[input$featureInput]] = factor(df[[input$featureInput]], levels = c(levs, unique(df[[input$featureInput]])[!unique(df[[input$featureInput]]) %in% levs]))
+        df[[input$featureInput]] = factor(df[[input$featureInput]], levels = c(levs, input$labelInput))
+
+        levs = levels(df.backup[[input$featureInput]])
+        df.backup[[input$featureInput]] = as.character(df.backup[[input$featureInput]])
+        df.backup[[input$featureInput]][which(df.backup$id %in% ids.selected)] = input$labelInput
+        df.backup[[input$featureInput]] = factor(df.backup[[input$featureInput]], levels = c(levs, input$labelInput))
       } else {
         df[[input$featureInput]][which(df$id %in% ids.selected)] = input$labelInput
+
+        df.backup[[input$featureInput]][which(df.backup$id %in% ids.selected)] = input$labelInput
       }
       session$sendCustomMessage(type = "Plot1_set", message = character(0))
     })
@@ -417,8 +423,10 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
         spots.seurat = paste0(seurat$barcodeB, "x", seurat$barcodeA)
         for (i in featureChoice) {
           if (is.factor(seurat@meta.data[[i]])) {
+            levs = levels(seurat@meta.data[[i]])
             seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
-            seurat@meta.data[[i]][spots.seurat %in% spots.df] = df[[i]]
+            seurat@meta.data[[i]][spots.seurat %in% spots.df] = as.character(df[[i]])
+            seurat@meta.data[[i]] = factor(seurat@meta.data[[i]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
           } else {
             seurat@meta.data[[i]][spots.seurat %in% spots.df] = df[[i]]
           }
