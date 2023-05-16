@@ -216,7 +216,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
                                           actionButton(inputId = "subset.ok", label = "Select", width = "10%")),
                                         tags$div(
                                           style = "display: flex; align-items: center;",
-                                          actionButton(inputId = "recover.ok", label = "Back to all celltypes!)", width = "50%"))), shiny::hr(),
+                                          actionButton(inputId = "recover.ok", label = "Back to all celltypes!", width = "50%"))), shiny::hr(),
 
                                       fluidRow(
                                         column(width = 6,
