@@ -11,6 +11,7 @@ library(tibble)
 library(data.table)
 library(stringr)
 
+library(ggiraph)
 library(ggplot2)
 library(viridis)
 library(grid)
@@ -143,36 +144,38 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
     coordinates = ann[[2]]
     img = ann[[3]]
 
-    coordinates = coordinates[paste0(anno.df$barcodeB, "x", anno.df$barcodeA), ]
-    coordinates$feature = anno.df[[show.feature]]
+    coordinates = coordinates[anno.df$barcode, ]
+    if (is.factor(anno.df[[show.feature]])) {
+      coordinates$feature = droplevels(anno.df[[show.feature]])
+    } else {
+      coordinates$feature = anno.df[[show.feature]]
+    }
 
     if (is.numeric(coordinates$feature)) {
       cols = viridis(100, option = "D")
-      p = ggplot(coordinates, aes(x = x, y = y, data_id = id)) +
+      p = ggplot(coordinates, aes(x = x, y = y, data_id = id, tooltip = round(feature, 3))) +
         annotation +
-        ggiraph::geom_point_interactive(aes(fill = feature, alpha = feature), size = pt.size, shape = shape, stroke = 0) +
+        geom_point_interactive(aes(fill = feature, alpha = feature), size = pt.size, shape = shape, stroke = 0) +
         scale_fill_gradientn(colors = cols) +
         scale_alpha(range = c(alpha, 1)) +
         ylim(nrow(img), 0) + xlim(0, ncol(img)) +
-        theme_void() + coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = T, clip = "on") +
-        theme(legend.position = "top") +
+        theme_void() + coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = F, clip = "on") +
+        theme(aspect.ratio = 1, legend.position = "top", plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
         guides(alpha = "none") +
-        theme(aspect.ratio = 1) +
         labs(fill = show.feature)
     } else {
       cols = c("#5A5156FF", "#E4E1E3FF", "#F6222EFF", "#FE00FAFF", "#16FF32FF", "#3283FEFF", "#FEAF16FF", "#B00068FF", "#1CFFCEFF", "#90AD1CFF", "#2ED9FFFF", "#DEA0FDFF", "#AA0DFEFF",
                "#F8A19FFF", "#325A9BFF", "#C4451CFF", "#1C8356FF", "#85660DFF", "#B10DA1FF", "#FBE426FF", "#1CBE4FFF", "#FA0087FF", "#FC1CBFFF", "#F7E1A0FF", "#C075A6FF", "#782AB6FF",
                "#AAF400FF", "#BDCDFFFF", "#822E1CFF", "#B5EFB5FF", "#7ED7D1FF", "#1C7F93FF", "#D85FF7FF", "#683B79FF", "#66B0FFFF", "#3B00FBFF")
-      p = ggplot(coordinates, aes(x = x, y = y, data_id = id)) +
+      p = ggplot(coordinates, aes(x = x, y = y, data_id = id, tooltip = feature)) +
         annotation +
-        ggiraph::geom_point_interactive(aes(fill = feature), size = pt.size, shape = shape, stroke = 0, alpha = alpha) +
+        geom_point_interactive(aes(fill = feature), size = pt.size, shape = shape, stroke = 0, alpha = alpha) +
         scale_fill_manual(values = cols) +
         ylim(nrow(img), 0) + xlim(0, ncol(img)) +
-        theme_void() + coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = T, clip = "on") +
-        theme(legend.position = "top") +
-        guides(alpha = "none") +
-        theme(aspect.ratio = 1) +
-        labs(fill = show.feature)
+        theme_void() + coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = F, clip = "on") +
+        theme(aspect.ratio = 1, legend.spacing.y = unit(0, "cm"), plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
+        labs(fill = show.feature) +
+        guides(alpha = "none", fill = guide_legend(ncol = 1, byrow = T, override.aes = list(size = 5)))
     }
 
     return(p)
@@ -281,7 +284,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
                                       tags$div(
                                         column(width = 6,
                                                actionButton(inputId = "stopApp", label = "Quit")))),
-                     dashboardBody(ggiraph::girafeOutput("Plot1", width = "100%", height = paste0(1080, "px"))),
+                     dashboardBody(girafeOutput("Plot1", width = "100%", height = "1280px")),
                      tags$head(
                        tags$style(HTML(".sidebar {width: 600px;}
                                  .my-row .form-group {margin-top: 0; margin-bottom: 0;}
@@ -293,15 +296,17 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
     options(shiny.maxRequestSize = 100*1024^2)
 
     if (sum(str_detect(colnames(seurat), "x")) < dim(seurat)[2]) {
-      stop("Your cell name must be formatted like 1x1, 1x2 ...")
+      stop("Your cell id must be formatted like 1x1, 1x2 or sample_1sx1, sample_1x2 ...")
     }
 
-    sampleChoice = unique(seurat$orig.ident)
+    sampleChoice = as.character(unique(seurat$orig.ident))
     shapeChoice = c(22, 21)
     featureChoice = colnames(seurat@meta.data)
+
+    prefix = ifelse(all(str_detect(colnames(seurat), sampleChoice[1])), paste0(sampleChoice[1], "_"), "")
     # add important feature!
-    seurat$barcodeB = str_split(colnames(seurat), "x", simplify = T)[ , 1]
-    seurat$barcodeA = str_split(colnames(seurat), "x", simplify = T)[ , 2]
+    seurat$barcodeB = str_split(gsub(prefix, "", colnames(seurat)), "x", simplify = T)[ , 1]
+    seurat$barcodeA = str_split(gsub(prefix, "", colnames(seurat)), "x", simplify = T)[ , 2]
     seurat$id = 1:dim(seurat)[2]
 
     updateSelectInput(session, inputId = "sampleInput", label = "Select sample", choices = sampleChoice, selected = sampleChoice[1])
@@ -313,7 +318,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
     df.backup = reactiveValues()
     for (i in featureChoice) {
       df[[i]] = seurat@meta.data[[i]]
+      df$barcode = rownames(seurat@meta.data)
       df.backup[[i]] = seurat@meta.data[[i]]
+      df.backup$barcode = rownames(seurat@meta.data)
     }
 
     rv = reactiveValues(sNr = "1", ann = NULL)
@@ -323,9 +330,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
     })
 
     observeEvent(input$gene.ok, {
-      mat.df = FetchData(srat.merge, vars = input$geneInput, slot = slot) %>% rownames_to_column(var = "barcode")
-      df.backup[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% paste0(df.backup$barcodeB, "x", df.backup$barcodeA)]
-      df[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% paste0(df$barcodeB, "x", df$barcodeA)]
+      mat.df = FetchData(seurat, vars = input$geneInput, slot = slot) %>% rownames_to_column(var = "barcode")
+      df.backup[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% df.backup$barcode]
+      df[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% df$barcode]
       updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = names(df), selected = input$geneInput)
       updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = names(df), selected = "orig.ident")
     })
@@ -383,15 +390,16 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
       rv$ann[[2]] = shrink.axis.shiny(rv$ann[[2]], x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), y.scale.factor = input$yShrink)
     })
 
-    output$Plot1 = ggiraph::renderGirafe({
+    output$Plot1 = renderGirafe({
       withProgress(message = "Updating plot", value = 0,
                    {
                      df.tmp = as.data.frame(reactiveValuesToList(df))
-                     x = ggiraph::girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10,
-                                                                         shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "orig.ident", input$featureInput)),
-                                         width_svg = 12, height_svg = 10)
-                     x = ggiraph::girafe_options(x, ggiraph::opts_zoom(max = 6),
-                                                 ggiraph::opts_selection(type = "multiple", css = "fill:transparent;stroke:transparent;opacity:0.7;"))
+                     x = girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10,
+                                                                shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "orig.ident", input$featureInput)),
+                                width_svg = 12, height_svg = 10)
+                     x = girafe_options(x, opts_zoom(max = 6),
+                                        opts_tooltip(opacity = 0.6),
+                                        opts_selection(type = "multiple", css = "fill:transparent;stroke:transparent;opacity:0.7;"))
                      x
                    })
     })
@@ -419,8 +427,8 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
     observe({
       if (input$stopApp > 0) {
         print("Stopped")
-        spots.df = paste0(df$barcodeB, "x", df$barcodeA)
-        spots.seurat = paste0(seurat$barcodeB, "x", seurat$barcodeA)
+        spots.df = df$barcode
+        spots.seurat = rownames(seurat@meta.data)
         for (i in featureChoice) {
           if (is.factor(seurat@meta.data[[i]])) {
             levs = levels(seurat@meta.data[[i]])
