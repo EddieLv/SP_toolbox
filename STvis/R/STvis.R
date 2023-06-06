@@ -296,16 +296,18 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
     options(shiny.maxRequestSize = 100*1024^2)
 
     if (length(Images(seurat)) > 1) {
-      message(paste("Detect", length(Images(srat.merge)), "images!"))
+      message(paste("Detect", length(Images(seurat)), "images!"))
       seurat.backup = seurat
       if (!is.null(image)) {
-        seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)))
+        seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)), slot = slot)
+        seurat@meta.data = seurat@meta.data[ , colnames(seurat.backup@meta.data)]
         img = list(seurat.backup@images[[image]]); names(img) = image
         seurat@images = img
       } else {
         warning("Please select your wanted image!")
         image = Images(seurat.backup)[1]
-        seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)))
+        seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)), slot = slot)
+        seurat@meta.data = seurat@meta.data[ , colnames(seurat.backup@meta.data)]
         img = list(seurat.backup@images[[image]]); names(img) = image
         seurat@images = img
       }
@@ -318,6 +320,10 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
     sampleChoice = as.character(unique(seurat$orig.ident))
     shapeChoice = c(22, 21)
     featureChoice = colnames(seurat@meta.data)
+    for (i in featureChoice) {
+      seurat@meta.data[is.na(seurat[[i]]), i] = "STvis"
+      seurat@meta.data[is.null(seurat[[i]]), i] = "STvis"
+    }
 
     prefix = ifelse(all(str_detect(colnames(seurat), sampleChoice[1])), paste0(sampleChoice[1], "_"), "")
     # add important feature!
@@ -449,6 +455,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
 
         # this function does not change the raw columns of seurat but add another renamed column!
         for (i in featureChoice) {
+
           # verify if the feature is changed!
           if (all(as.character(seurat@meta.data[[i]][spots.seurat %in% spots.df]) == as.character(df[[i]]))) {
             if (is.factor(seurat@meta.data[[i]])) {
@@ -507,6 +514,6 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
 
   }
 
-  runApp(list(ui = ui, server = server), launch.browser = getOption("shiny.launch.browser", interactive()))
+  runApp(list(ui = ui, server = server), launch.browser = getOption("/usr/bin/google-chrome", interactive()))
 }
 
