@@ -16,7 +16,7 @@ library(ggplot2)
 library(viridis)
 library(grid)
 
-shiny_st = function(seurat, assay = "SCT", slot = "data") {
+shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
   DefaultAssay(seurat) = assay
 
   move.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.num = 0, y.num = 0) {
@@ -295,6 +295,22 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
   server = function(input, output, session) {
     options(shiny.maxRequestSize = 100*1024^2)
 
+    if (length(Images(seurat)) > 1) {
+      message(paste("Detect", length(Images(srat.merge)), "images!"))
+      seurat.backup = seurat
+      if (!is.null(image)) {
+        seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)))
+        img = list(seurat.backup@images[[image]]); names(img) = image
+        seurat@images = img
+      } else {
+        warning("Please select your wanted image!")
+        image = Images(seurat.backup)[1]
+        seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)))
+        img = list(seurat.backup@images[[image]]); names(img) = image
+        seurat@images = img
+      }
+    }
+
     if (sum(str_detect(colnames(seurat), "x")) < dim(seurat)[2]) {
       stop("Your cell id must be formatted like 1x1, 1x2 or sample_1sx1, sample_1x2 ...")
     }
@@ -425,22 +441,55 @@ shiny_st = function(seurat, assay = "SCT", slot = "data") {
     })
 
     observe({
+
       if (input$stopApp > 0) {
         print("Stopped")
         spots.df = df$barcode
         spots.seurat = rownames(seurat@meta.data)
+
+        # this function does not change the raw columns of seurat but add another renamed column!
         for (i in featureChoice) {
-          if (is.factor(seurat@meta.data[[i]])) {
-            levs = levels(seurat@meta.data[[i]])
-            seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
-            seurat@meta.data[[i]][spots.seurat %in% spots.df] = as.character(df[[i]])
-            seurat@meta.data[[i]] = factor(seurat@meta.data[[i]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
+          # verify if the feature is changed!
+          if (all(as.character(seurat@meta.data[[i]][spots.seurat %in% spots.df]) == as.character(df[[i]]))) {
+            if (is.factor(seurat@meta.data[[i]])) {
+              levs = levels(seurat@meta.data[[i]])
+              seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
+              seurat@meta.data[[i]][spots.seurat %in% spots.df] = as.character(df[[i]])
+              seurat@meta.data[[i]] = factor(seurat@meta.data[[i]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
+            } else {
+              seurat@meta.data[[i]][spots.seurat %in% spots.df] = df[[i]]
+            }
           } else {
-            seurat@meta.data[[i]][spots.seurat %in% spots.df] = df[[i]]
+            if (is.factor(seurat@meta.data[[i]])) {
+              levs = levels(seurat@meta.data[[i]])
+              seurat@meta.data[[paste0(i, ".STvis")]] = as.character(seurat@meta.data[[i]])
+              seurat@meta.data[[paste0(i, ".STvis")]][spots.seurat %in% spots.df] = as.character(df[[i]])
+              seurat@meta.data[[paste0(i, ".STvis")]] = factor(seurat@meta.data[[paste0(i, ".STvis")]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
+            } else {
+              seurat@meta.data[[paste0(i, ".STvis")]][spots.seurat %in% spots.df] = df[[i]]
+            }
           }
+
         }
-        stopApp(returnValue = seurat)
+
+        if (exists("seurat.backup")) {
+          if (dim(seurat@meta.data)[2] > dim(seurat.backup@meta.data)[2]) {
+            seurat.backup@meta.data[rownames(seurat@meta.data), ] = seurat@meta.data[ , colnames(seurat.backup@meta.data)]
+            extra.columns = colnames(seurat@meta.data)[!colnames(seurat@meta.data) %in% colnames(seurat.backup@meta.data)]
+            for (i in extra.columns) {
+              seurat.backup@meta.data[[i]] = as.character(seurat.backup@meta.data[[gsub(".STvis", "", i)]])
+              seurat.backup@meta.data[rownames(seurat@meta.data), i] = seurat@meta.data[[i]]
+            }
+          } else {
+            seurat.backup@meta.data[rownames(seurat@meta.data), ] = seurat@meta.data
+          }
+          stopApp(returnValue = seurat.backup)
+        } else {
+          stopApp(returnValue = seurat)
+        }
+
       }
+
     })
 
     observeEvent(input$info, {
