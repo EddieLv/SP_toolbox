@@ -455,41 +455,18 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
 
         # this function does not change the raw columns of seurat but add another renamed column!
         for (i in featureChoice) {
-
-          # verify if the feature is changed!
-          if (all(as.character(seurat@meta.data[[i]][spots.seurat %in% spots.df]) == as.character(df[[i]]))) {
-            if (is.factor(seurat@meta.data[[i]])) {
-              levs = levels(seurat@meta.data[[i]])
-              seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
-              seurat@meta.data[[i]][spots.seurat %in% spots.df] = as.character(df[[i]])
-              seurat@meta.data[[i]] = factor(seurat@meta.data[[i]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
-            } else {
-              seurat@meta.data[[i]][spots.seurat %in% spots.df] = df[[i]]
-            }
+          if (is.factor(seurat@meta.data[[i]])) {
+            levs = levels(seurat@meta.data[[i]])
+            seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
+            seurat@meta.data[[i]][spots.seurat %in% spots.df] = as.character(df[[i]])
+            seurat@meta.data[[i]] = factor(seurat@meta.data[[i]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
           } else {
-            if (is.factor(seurat@meta.data[[i]])) {
-              levs = levels(seurat@meta.data[[i]])
-              seurat@meta.data[[paste0(i, ".STvis")]] = as.character(seurat@meta.data[[i]])
-              seurat@meta.data[[paste0(i, ".STvis")]][spots.seurat %in% spots.df] = as.character(df[[i]])
-              seurat@meta.data[[paste0(i, ".STvis")]] = factor(seurat@meta.data[[paste0(i, ".STvis")]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
-            } else {
-              seurat@meta.data[[paste0(i, ".STvis")]][spots.seurat %in% spots.df] = df[[i]]
-            }
+            seurat@meta.data[[i]][spots.seurat %in% spots.df] = df[[i]]
           }
-
         }
 
         if (exists("seurat.backup")) {
-          if (dim(seurat@meta.data)[2] > dim(seurat.backup@meta.data)[2]) {
-            seurat.backup@meta.data[rownames(seurat@meta.data), ] = seurat@meta.data[ , colnames(seurat.backup@meta.data)]
-            extra.columns = colnames(seurat@meta.data)[!colnames(seurat@meta.data) %in% colnames(seurat.backup@meta.data)]
-            for (i in extra.columns) {
-              seurat.backup@meta.data[[i]] = as.character(seurat.backup@meta.data[[gsub(".STvis", "", i)]])
-              seurat.backup@meta.data[rownames(seurat@meta.data), i] = seurat@meta.data[[i]]
-            }
-          } else {
-            seurat.backup@meta.data[rownames(seurat@meta.data), ] = seurat@meta.data
-          }
+          seurat.backup@meta.data[rownames(seurat@meta.data), ] = seurat@meta.data
           stopApp(returnValue = seurat.backup)
         } else {
           stopApp(returnValue = seurat)
