@@ -461,7 +461,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         # this function does not change the raw columns of seurat but add another renamed column!
         for (i in featureChoice) {
           if (is.factor(seurat@meta.data[[i]])) {
-            levs = levels(seurat@meta.data[[i]])
+            levs = levels(droplevels(seurat@meta.data[[i]]))
             seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
             seurat@meta.data[[i]][spots.seurat %in% spots.df] = as.character(df[[i]])
             seurat@meta.data[[i]] = factor(seurat@meta.data[[i]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
@@ -471,7 +471,16 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         }
 
         if (exists("seurat.backup")) {
-          seurat.backup@meta.data[rownames(seurat@meta.data), ] = seurat@meta.data
+          for (i in colnames(seurat@meta.data)) {
+            if (is.factor(seurat@meta.data[[i]])) {
+              levs = levels(droplevels(seurat.backup@meta.data[[i]]))
+              seurat.backup@meta.data[[i]] = as.character(seurat.backup@meta.data[[i]])
+              seurat.backup@meta.data[[i]][rownames(seurat.backup@meta.data) %in% rownames(seurat@meta.data)] = as.character(seurat@meta.data[[i]])
+              seurat.backup@meta.data[[i]] = factor(seurat.backup@meta.data[[i]], levels = c(levs, levels(seurat@meta.data[ , i])[!levels(seurat@meta.data[ , i]) %in% levs]))
+            } else {
+              seurat.backup@meta.data[rownames(seurat@meta.data), i] = seurat@meta.data[ , i]
+            }
+          }
           stopApp(returnValue = seurat.backup)
         } else {
           stopApp(returnValue = seurat)
