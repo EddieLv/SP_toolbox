@@ -471,7 +471,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         }
 
         if (exists("seurat.backup")) {
-          for (i in colnames(seurat@meta.data)) {
+          for (i in colnames(seurat.backup@meta.data)) {
             if (is.factor(seurat@meta.data[[i]])) {
               levs = levels(droplevels(seurat.backup@meta.data[[i]]))
               seurat.backup@meta.data[[i]] = as.character(seurat.backup@meta.data[[i]])
