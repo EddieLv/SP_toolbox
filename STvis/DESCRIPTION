@@ -24,4 +24,5 @@ Depends:
     ggiraph,
     stringr,
     viridis,
-    grid
+    grid,
+    RColorBrewer
