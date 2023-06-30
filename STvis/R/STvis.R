@@ -140,7 +140,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                coordinates = tissue.positions, spot.radius = spot.radius))
   }
 
-  make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.size = 0.1, shape = 22, show.feature = NULL, transparent.ids = NULL) {
+  make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.size = 0.1, shape = 22, show.feature = NULL) {
     annotation = ann[[1]]
     coordinates = ann[[2]]
     img = ann[[3]]
@@ -284,7 +284,10 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                       tags$div(
                                         column(width = 6,
                                                actionButton(inputId = "stopApp", label = "Quit")))),
-                     dashboardBody(girafeOutput("Plot1", width = "100%", height = "1280px"), girafeOutput("Plot2", width = "100%", height = "1280px")),
+                     dashboardBody(h4(strong("===Attention==="), br(),
+                                      "Do not change any attributes before you confirmed selected spots!", br(),
+                                      "Otherwise you will lose your selected spots!", style = "color:red;"),
+                                   girafeOutput("Plot1", width = "100%", height = "1280px")),
                      tags$head(
                        tags$style(HTML(".sidebar {width: 600px;}
                                  .my-row .form-group {margin-top: 0; margin-bottom: 0;}
@@ -427,15 +430,14 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
       withProgress(message = "Updating plot", value = 0,
                    {
                      df.tmp = as.data.frame(reactiveValuesToList(df))
-                     df.tmp = df.tmp %>% dplyr::filter(!id %in% as.numeric(selected$selected.ids))
 
-                     x = girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10, transparent.ids = as.numeric(input$Plot1_selected),
+                     x = girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10,
                                                                 shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "orig.ident", input$featureInput)),
                                 width_svg = 12, height_svg = 10)
                      x = girafe_options(x,
                                         opts_zoom(min = 1, max = 10),
                                         opts_tooltip(opacity = 1),
-                                        opts_toolbar(position = "top",
+                                        opts_toolbar(position = "topright",
                                                      saveaspng = TRUE,
                                                      pngname = Images(seurat)[1],
                                                      list(lasso_select = "lasso",
@@ -444,20 +446,15 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                                           saveaspng = "download png"),
                                                      hidden = c("lasso_deselect", "zoom_rect")),
                                         opts_selection(type = "multiple", css = "fill:transparent;stroke:transparent;"),
-                                        opts_selection_key(css = "stroke:black;r:5pt;"),
-                                        opts_hover(css = "fill:wheat;stroke:black;stroke-width:3px;cursor:pointer;"),
+                                        opts_selection_key(css = "stroke:black;r:1pt;"),
+                                        opts_hover(css = "fill:wheat;stroke:black;stroke-width:1px;cursor:pointer;"),
                                         opts_hover_key(css = "stroke:black;r:5pt;cursor:pointer;"))
                      x
                    })
     })
 
-    selected = reactiveValues(selected.ids = c())
-    observeEvent(input$Plot1_selected, {
-      selected$selected.ids = c(selected$selected.ids, input$Plot1_selected)
-    })
-
     observeEvent(input$confirm, {
-      ids.selected = as.numeric(selected$selected.ids)
+      ids.selected = as.numeric(input$Plot1_selected)
       if (is.factor(df[[input$featureInput]])) {
         levs = levels(df[[input$featureInput]])
         df[[input$featureInput]] = as.character(df[[input$featureInput]])
@@ -473,7 +470,6 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
 
         df.backup[[input$featureInput]][which(df.backup$id %in% ids.selected)] = input$labelInput
       }
-      selected$selected.ids = c()
       session$sendCustomMessage(type = "Plot1_set", message = character(0))
     })
 
