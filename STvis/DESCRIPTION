@@ -25,4 +25,5 @@ Depends:
     stringr,
     viridis,
     grid,
-    RColorBrewer
+    RColorBrewer,
+    shinyalert
