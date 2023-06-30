@@ -1,5 +1,6 @@
 library(magick)
 library(shiny)
+library(shinyalert)
 library(shinydashboard)
 library(png)
 library(tools)
@@ -18,51 +19,51 @@ library(grid)
 
 shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
   DefaultAssay(seurat) = assay
-  
+
   move.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.num = 0, y.num = 0) {
     # 定义旋转角度和旋转中心坐标
     n.min = (1 - 0.5) * 1080 / numBarcode
-    
+
     df.old = df
     # 赋值时x y对调
     df[, y] = df.old[, y] + y.num*n.min
     df[, x] = df.old[, x] + x.num*n.min
-    
+
     return(df)
   }
-  
+
   shrink.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.scale.factor = 1, y.scale.factor = 1) {
-    
+
     df.old = df
     # 赋值时x y对调
     df[, y] = df.old[, y]*y.scale.factor
     df[, x] = df.old[, x]*x.scale.factor
-    
+
     return(df)
   }
-  
+
   rotate.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, angle = 0) {
     rad = angle * pi / 180
-    
+
     # 定义旋转角度和旋转中心坐标
     n.min = (1 - 0.5) * 1080 / numBarcode
     n.max = (numBarcode - 0.5) * 1080 / numBarcode
     n.mid = (n.min + n.max) / 2
     center = c(n.mid, n.mid)
-    
+
     df.old = df
     # 赋值时x y对调
     df[, y] = (df.old[, y] - center[2]) * cos(rad) - (df.old[, x] - center[1]) * sin(rad) + center[1] # y1 = y*cos(β) - x*sin(β)
     df[, x] = (df.old[, x] - center[1]) * cos(rad) + (df.old[, y] - center[2]) * sin(rad) + center[2] # x1 = x*cos(β) + y*sin(β)
-    
+
     return(df)
   }
-  
+
   flip.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, horizontal = F, vertical = F) {
     # (numBarcode + 1 - 0.5 - iA) * 1080 / numBarcode
     n.min = (1 - 0.5) * 1080 / numBarcode
     n.max = (numBarcode - 0.5) * 1080 / numBarcode
-    
+
     df.old = df
     if (horizontal) {
       if (numBarcode == 50) {
@@ -72,7 +73,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         df[, y] = n.max - df.old[, y] + n.min
       }
     }
-    
+
     if (vertical) {
       if (numBarcode == 50) {
         df[, x] = n.max - df.old[, x] + n.min
@@ -81,21 +82,21 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         df[, x] = n.max - df.old[, x] + n.min
       }
     }
-    
+
     return(df)
   }
-  
+
   create_tissue_position.shiny = function(numBarcode) {
-    
+
     barcode_index = 1:numBarcode
     tissue.positions = data.frame(iB = rep(barcode_index, each = numBarcode),
                                   iA = rep(barcode_index, times = numBarcode),
                                   tissue = 1)
-    
+
     if (!numBarcode %in% c(50, 96)) {
       stop("Please make sure your barcode num is 50 or 96!")
     }
-    
+
     if (numBarcode == 96) {
       # imagecol = (numBarcode + 1 - 0.0 - iA) * 1080 / numBarcode
       # imagerow = (iB - 0.0) * 1080 / numBarcode)
@@ -104,21 +105,21 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                                      imagerow = (iB - 0.5) * 1080 / numBarcode) %>%
         rename(col = iB, row = iA)
     }
-    
+
     if (numBarcode == 50) {
       tissue.positions = tissue.positions %>% mutate(barcodes = paste0(iB, "x", iA),
                                                      imagecol = (iA - 0.5) * 1080 / numBarcode,
                                                      imagerow = (numBarcode + 1 - 0.5 - iB) * 1080 / numBarcode) %>%
         rename(col = iB, row = iA)
     }
-    
+
     rownames(tissue.positions) = tissue.positions$barcodes
     tissue.positions = tissue.positions %>%
       select(c(tissue, col, row, imagecol, imagerow))
-    
+
     return(tissue.positions)
   }
-  
+
   read_spatial = function (numBarcode, spatial_img) {
     image = readPNG(source = spatial_img)
     scale.factors = list(
@@ -127,30 +128,29 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
       "fiducial_diameter_fullres" = ifelse(numBarcode == 50, 184.32, 96),
       "tissue_lowres_scalef" = 1
     )
-    
+
     tissue.positions = create_tissue_position.shiny(numBarcode)
-    
+
     unnormalized.radius = scale.factors$fiducial_diameter_fullres * scale.factors$tissue_lowres_scalef
     spot.radius = unnormalized.radius/max(dim(x = image))
-    
+
     return(new(Class = "VisiumV1", image = image, scale.factors = scalefactors(spot = scale.factors$tissue_hires_scalef,
                                                                                fiducial = scale.factors$fiducial_diameter_fullres,
                                                                                hires = scale.factors$tissue_hires_scalef, scale.factors$tissue_lowres_scalef),
                coordinates = tissue.positions, spot.radius = spot.radius))
   }
-  
-  make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.size = 0.1, shape = 22, show.feature = NULL) {
+
+  make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.size = 0.1, shape = 22, show.feature = NULL, transparent.ids = NULL) {
     annotation = ann[[1]]
     coordinates = ann[[2]]
     img = ann[[3]]
-    
     coordinates = coordinates[anno.df$barcode, ]
     if (is.factor(anno.df[[show.feature]])) {
       coordinates$feature = droplevels(anno.df[[show.feature]])
     } else {
       coordinates$feature = anno.df[[show.feature]]
     }
-    
+
     if (is.numeric(coordinates$feature)) {
       cols = colorRampPalette(colors = rev(x = brewer.pal(n = 11, name = "Spectral")))(100)
       p = ggplot(coordinates, aes(x = x, y = y, data_id = id, tooltip = round(feature, 3))) +
@@ -164,25 +164,25 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         guides(alpha = "none") +
         labs(fill = show.feature)
     } else {
-      cols = c("#5A5156FF", "#E4E1E3FF", "#F6222EFF", "#FE00FAFF", "#16FF32FF", "#3283FEFF", "#FEAF16FF", "#B00068FF", "#1CFFCEFF", "#90AD1CFF", "#2ED9FFFF", "#DEA0FDFF", "#AA0DFEFF",
+      cols = c("#F6222EFF", "#E4E1E3FF", "#5A5156FF", "#FE00FAFF", "#16FF32FF", "#3283FEFF", "#FEAF16FF", "#B00068FF", "#1CFFCEFF", "#90AD1CFF", "#2ED9FFFF", "#DEA0FDFF", "#AA0DFEFF",
                "#F8A19FFF", "#325A9BFF", "#C4451CFF", "#1C8356FF", "#85660DFF", "#B10DA1FF", "#FBE426FF", "#1CBE4FFF", "#FA0087FF", "#FC1CBFFF", "#F7E1A0FF", "#C075A6FF", "#782AB6FF",
                "#AAF400FF", "#BDCDFFFF", "#822E1CFF", "#B5EFB5FF", "#7ED7D1FF", "#1C7F93FF", "#D85FF7FF", "#683B79FF", "#66B0FFFF", "#3B00FBFF")
       p = ggplot(coordinates, aes(x = x, y = y, data_id = id, tooltip = feature)) +
         annotation +
         geom_point_interactive(aes(fill = feature), size = pt.size, shape = shape, stroke = 0, alpha = alpha) +
-        scale_fill_manual(values = cols) +
         ylim(nrow(img), 0) + xlim(0, ncol(img)) +
         theme_void() + coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = F, clip = "on") +
         theme(aspect.ratio = 1, legend.spacing.y = unit(0, "cm"), plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
-        labs(fill = show.feature) +
-        guides(alpha = "none", fill = guide_legend(ncol = 1, byrow = T, override.aes = list(size = 5)))
+        scale_fill_manual_interactive(values = cols) +
+        guides(alpha = "none", fill = guide_legend(ncol = 1, byrow = T, override.aes = list(size = 5))) +
+        labs(fill = show.feature)
     }
-    
+
     return(p)
   }
-  
+
   add_image = function (seurat) {
-    
+
     image = Images(seurat)[1]
     coordinates = GetTissueCoordinates(seurat, image = image) %>%
       mutate(x = imagerow * seurat@images[[image]]@scale.factors$lowres,
@@ -190,19 +190,19 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
     coordinates = rotate.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), angle = 90)
     coordinates = flip.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), horizontal = T)
     coordinates$id = seurat$id
-    
+
     img = seurat@images[[image]]@image
     img_grob = grid::rasterGrob(img, interpolate = FALSE, width = grid::unit(1, "npc"), height = grid::unit(1, "npc"))
     annotation = annotation_custom(grob = img_grob, xmin = 0, xmax = ncol(img), ymin = 0, ymax = -nrow(img))
-    
+
     return(list(annotation, coordinates, img))
   }
-  
+
   ui = dashboardPage(dashboardHeader(title = tags$div(style = "white-space: pre-wrap; word-wrap: break-word; line-height: 1.2;",
                                                       "ST Visualization Tool (STvis v1.0.0)\n---please watch the [Instructions] first---"), titleWidth = 450),
                      dashboardSidebar(width = 600,
                                       actionButton(inputId = "info", label = "Instructions"), shiny::hr(),
-                                      
+
                                       fluidRow(
                                         column(width = 4,
                                                selectInput(inputId = "sampleInput", label = "Select sample", choices = NULL, selected = NULL, width = "100%")),
@@ -210,7 +210,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                                selectInput(inputId = "shapeInput", label = "Select shape", choices = c(22), selected = 22, width = "100%")),
                                         column(width = 4,
                                                selectInput(inputId = "featureInput", label = "Select feature", choices = c("orig.ident"), selected = "orig.ident", width = "100%"))), shiny::hr(),
-                                      
+
                                       fluidRow(
                                         tags$div(
                                           style = "display: flex; align-items: center;",
@@ -220,13 +220,13 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                         tags$div(
                                           style = "display: flex; align-items: center;",
                                           actionButton(inputId = "recover.ok", label = "Back to all celltypes!", width = "50%"))), shiny::hr(),
-                                      
+
                                       fluidRow(
                                         column(width = 6,
-                                               sliderInput(inputId = "alphaValue", label = "Spot.alpha [0-1]", min = 0, max = 1, value = 0.8, step = 0.1)),
+                                               sliderInput(inputId = "alphaValue", label = "Spot.alpha [0-1]", min = 0, max = 1, value = 0.8, step = 0.05)),
                                         column(width = 6,
-                                               sliderInput(inputId = "spotSize", label = "Spot.size [0-1]", min = 0, max = 1, value = 0.1, step = 0.1))), shiny::hr(),
-                                      
+                                               sliderInput(inputId = "spotSize", label = "Spot.size [0-1]", min = 0, max = 1, value = 0.1, step = 0.05))), shiny::hr(),
+
                                       fluidRow(
                                         column(width = 6,
                                                actionButton(inputId = "vertical", label = "Flip by vertical", width = "85%"),
@@ -235,7 +235,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                           style = "display: flex; align-items: center;",
                                           numericInput(inputId = "angle", label = "Rotate by angle [-360, 360, 1]", value = 0, min = -360, max = 360, step = 1, width = "70%"),
                                           actionButton(inputId = "angle.ok", label = "√", width = "10%"))),
-                                      
+
                                       tags$div(
                                         tags$div(
                                           style = "flex-basis: 50%; margin-bottom: 10px;",
@@ -252,7 +252,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                               actionButton(inputId = "yMove.ok", label = "√", width = "10%")
                                             )
                                           )),
-                                        
+
                                         tags$div(
                                           style = "flex-basis: 50%;",
                                           tags$div(
@@ -269,32 +269,32 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                             )
                                           ))
                                       ), shiny::hr(),
-                                      
+
                                       tags$div(
                                         style = "display: flex; align-items: center;",
                                         textInput(inputId = "geneInput", label = "Select one gene to visualize", value = ""),
                                         actionButton(inputId = "gene.ok", label = "√")
                                       ), shiny::hr(),
-                                      
+
                                       tags$div(
                                         style = "display: flex; align-items: center;",
                                         textInput(inputId = "labelInput", label = "Set label for selected spots", value = "", width = "50%"),
                                         actionButton(inputId = "confirm", label = "Confirm")), shiny::hr(),
-                                      
+
                                       tags$div(
                                         column(width = 6,
                                                actionButton(inputId = "stopApp", label = "Quit")))),
-                     dashboardBody(girafeOutput("Plot1", width = "100%", height = "1280px")),
+                     dashboardBody(girafeOutput("Plot1", width = "100%", height = "1280px"), girafeOutput("Plot2", width = "100%", height = "1280px")),
                      tags$head(
                        tags$style(HTML(".sidebar {width: 600px;}
                                  .my-row .form-group {margin-top: 0; margin-bottom: 0;}
                                  .content-wrapper {margin-left: 0;}
                                  .input-group {margin-right: 0;}")))
   )
-  
+
   server = function(input, output, session) {
     options(shiny.maxRequestSize = 100*1024^2)
-    
+
     if (length(Images(seurat)) > 1) {
       message(paste("Detect", length(Images(seurat)), "images!"))
       seurat.backup = seurat
@@ -312,11 +312,11 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         seurat@images = img
       }
     }
-    
+
     if (sum(str_detect(colnames(seurat), "x")) < dim(seurat)[2]) {
       stop("Your cell id must be formatted like 1x1, 1x2 or sample_1sx1, sample_1x2 ...")
     }
-    
+
     sampleChoice = as.character(unique(seurat$orig.ident))
     shapeChoice = c(22, 21)
     featureChoice = colnames(seurat@meta.data)
@@ -324,18 +324,18 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
     #   seurat@meta.data[is.na(seurat[[i]]), i] = "STvis"
     #   seurat@meta.data[is.null(seurat[[i]]), i] = "STvis"
     # }
-    
+
     prefix = ifelse(all(str_detect(colnames(seurat), sampleChoice[1])), paste0(sampleChoice[1], "_"), "")
     # add important feature!
     seurat$barcodeB = str_split(gsub(prefix, "", colnames(seurat)), "x", simplify = T)[ , 1]
     seurat$barcodeA = str_split(gsub(prefix, "", colnames(seurat)), "x", simplify = T)[ , 2]
     seurat$id = 1:dim(seurat)[2]
-    
+
     updateSelectInput(session, inputId = "sampleInput", label = "Select sample", choices = sampleChoice, selected = sampleChoice[1])
     updateSelectInput(session, inputId = "shapeInput", label = "Select shape", choices = shapeChoice, selected = 22)
     updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = featureChoice, selected = "orig.ident")
     updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = featureChoice, selected = "orig.ident")
-    
+
     df = reactiveValues()
     df.backup = reactiveValues()
     for (i in c(featureChoice, "id")) {
@@ -349,24 +349,29 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
       df$barcode = rownames(seurat@meta.data)
       df.backup$barcode = rownames(seurat@meta.data)
     }
-    
+
     rv = reactiveValues(sNr = "1", ann = NULL)
     observeEvent(input$sampleInput, {
       rv$sNr = sampleChoice[1]
       rv$ann = add_image(seurat)
     })
-    
+
     observeEvent(input$gene.ok, {
+      mat.df = GetAssayData(seurat, assay = assay, slot = slot)
+      if (!input$geneInput %in% rownames(mat.df)) {
+        shinyalert(paste(input$geneInput, "does not exists in", Images(seurat)[1], "-", assay, "-", slot, "!"))
+        return(NULL)
+      }
       mat.df = FetchData(seurat, vars = input$geneInput, slot = slot) %>% rownames_to_column(var = "barcode")
       df.backup[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% df.backup$barcode]
       df[[input$geneInput]] = mat.df[[input$geneInput]][mat.df$barcode %in% df$barcode]
       updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = names(df), selected = input$geneInput)
       updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = names(df), selected = "orig.ident")
     })
-    
+
     observeEvent(input$subset.ok, {
       subset.features = strsplit(input$subsetString, split = ",")[[1]]
-      
+
       if (all(subset.features %in% df[[input$subsetFeature]])) {
         for (i in names(df)[names(df) != input$subsetFeature]) {
           df[[i]] = df[[i]][df[[input$subsetFeature]] %in% subset.features]
@@ -382,57 +387,77 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         df[[input$subsetFeature]] = df.backup[[input$subsetFeature]][df.backup[[input$subsetFeature]] %in% subset.features]
       }
     })
-    
+
     observeEvent(input$recover.ok, {
       for (i in names(df)) {
         df[[i]] = df.backup[[i]]
       }
+      selected$selected.ids = c()
     })
-    
+
     observeEvent(input$vertical, {
       rv$ann[[2]] = flip.axis.shiny(rv$ann[[2]], x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), horizontal = T)
     })
-    
+
     observeEvent(input$horizontal, {
       rv$ann[[2]] = flip.axis.shiny(rv$ann[[2]], x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), vertical = T)
     })
-    
+
     observeEvent(input$angle.ok, {
       rv$ann[[2]] = rotate.axis.shiny(rv$ann[[2]], x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), angle = input$angle)
     })
-    
+
     observeEvent(input$xMove.ok, {
       rv$ann[[2]] = move.axis.shiny(rv$ann[[2]], x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), x.num = input$xMove)
     })
-    
+
     observeEvent(input$yMove.ok, {
       rv$ann[[2]] = move.axis.shiny(rv$ann[[2]], x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), y.num = input$yMove)
     })
-    
+
     observeEvent(input$xShrink.ok, {
       rv$ann[[2]] = shrink.axis.shiny(rv$ann[[2]], x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), x.scale.factor = input$xShrink)
     })
-    
+
     observeEvent(input$yShrink.ok, {
       rv$ann[[2]] = shrink.axis.shiny(rv$ann[[2]], x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), y.scale.factor = input$yShrink)
     })
-    
+
     output$Plot1 = renderGirafe({
       withProgress(message = "Updating plot", value = 0,
                    {
                      df.tmp = as.data.frame(reactiveValuesToList(df))
-                     x = girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10,
+                     df.tmp = df.tmp %>% dplyr::filter(!id %in% as.numeric(selected$selected.ids))
+
+                     x = girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10, transparent.ids = as.numeric(input$Plot1_selected),
                                                                 shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "orig.ident", input$featureInput)),
                                 width_svg = 12, height_svg = 10)
-                     x = girafe_options(x, opts_zoom(max = 6),
-                                        opts_tooltip(opacity = 0.6),
-                                        opts_selection(type = "multiple", css = "fill:transparent;stroke:transparent;opacity:0.7;"))
+                     x = girafe_options(x,
+                                        opts_zoom(min = 1, max = 10),
+                                        opts_tooltip(opacity = 1),
+                                        opts_toolbar(position = "top",
+                                                     saveaspng = TRUE,
+                                                     pngname = Images(seurat)[1],
+                                                     list(lasso_select = "lasso",
+                                                          zoom_on = "zoom",
+                                                          zoom_reset = "recover",
+                                                          saveaspng = "download png"),
+                                                     hidden = c("lasso_deselect", "zoom_rect")),
+                                        opts_selection(type = "multiple", css = "fill:transparent;stroke:transparent;"),
+                                        opts_selection_key(css = "stroke:black;r:5pt;"),
+                                        opts_hover(css = "fill:wheat;stroke:black;stroke-width:3px;cursor:pointer;"),
+                                        opts_hover_key(css = "stroke:black;r:5pt;cursor:pointer;"))
                      x
                    })
     })
-    
+
+    selected = reactiveValues(selected.ids = c())
+    observeEvent(input$Plot1_selected, {
+      selected$selected.ids = c(selected$selected.ids, input$Plot1_selected)
+    })
+
     observeEvent(input$confirm, {
-      ids.selected = as.numeric(input$Plot1_selected)
+      ids.selected = as.numeric(selected$selected.ids)
       if (is.factor(df[[input$featureInput]])) {
         levs = levels(df[[input$featureInput]])
         df[[input$featureInput]] = as.character(df[[input$featureInput]])
@@ -445,19 +470,20 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         df.backup[[input$featureInput]] = factor(df.backup[[input$featureInput]], levels = c(levs, input$labelInput))
       } else {
         df[[input$featureInput]][which(df$id %in% ids.selected)] = input$labelInput
-        
+
         df.backup[[input$featureInput]][which(df.backup$id %in% ids.selected)] = input$labelInput
       }
+      selected$selected.ids = c()
       session$sendCustomMessage(type = "Plot1_set", message = character(0))
     })
-    
+
     observe({
-      
+
       if (input$stopApp > 0) {
         print("Stopped")
         spots.df = df$barcode
         spots.seurat = rownames(seurat@meta.data)
-        
+
         # this function does not change the raw columns of seurat but add another renamed column!
         for (i in featureChoice) {
           if (is.factor(seurat@meta.data[[i]])) {
@@ -469,7 +495,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
             seurat@meta.data[[i]][spots.seurat %in% spots.df] = df[[i]]
           }
         }
-        
+
         if (exists("seurat.backup")) {
           for (i in colnames(seurat.backup@meta.data)) {
             if (is.factor(seurat@meta.data[[i]])) {
@@ -485,11 +511,11 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         } else {
           stopApp(returnValue = seurat)
         }
-        
+
       }
-      
+
     })
-    
+
     observeEvent(input$info, {
       showModal(modalDialog(title = "Instructions",
                             HTML("* Copyright (c) 2023.05.12, genger<br>* All rights reserved.<br>",
@@ -502,10 +528,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                             easyClose = TRUE,
                             footer = NULL))
     })
-    
+
   }
-  
+
   runApp(list(ui = ui, server = server), launch.browser = getOption("/usr/bin/google-chrome", interactive()))
 }
-
 
