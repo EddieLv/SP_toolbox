@@ -223,9 +223,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
 
                                       fluidRow(
                                         column(width = 6,
-                                               sliderInput(inputId = "alphaValue", label = "Spot.alpha [0-1]", min = 0, max = 1, value = 0.8, step = 0.01)),
+                                               sliderInput(inputId = "alphaValue", label = "Spot.alpha [0-1]", min = 0, max = 1, value = 0.8, step = 0.05)),
                                         column(width = 6,
-                                               sliderInput(inputId = "spotSize", label = "Spot.size [0-1]", min = 0, max = 1, value = 0.1, step = 0.01))), shiny::hr(),
+                                               sliderInput(inputId = "spotSize", label = "Spot.size [0-1]", min = 0, max = 1, value = 0.1, step = 0.05))), shiny::hr(),
 
                                       fluidRow(
                                         column(width = 6,
@@ -379,15 +379,19 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         for (i in names(df)[names(df) != input$subsetFeature]) {
           df[[i]] = df[[i]][df[[input$subsetFeature]] %in% subset.features]
         }
-        df[[input$subsetFeature]] = df[[input$subsetFeature]][df[[input$subsetFeature]] %in% subset.features]
+
         if (is.factor(df[[input$subsetFeature]])) {
           df[[input$subsetFeature]] = droplevels(df[[input$subsetFeature]])
         }
+        df[[input$subsetFeature]] = df[[input$subsetFeature]][df[[input$subsetFeature]] %in% subset.features]
+
       } else {
+
         for (i in names(df)[names(df) != input$subsetFeature]) {
           df[[i]] = df.backup[[i]][df.backup[[input$subsetFeature]] %in% subset.features]
         }
         df[[input$subsetFeature]] = df.backup[[input$subsetFeature]][df.backup[[input$subsetFeature]] %in% subset.features]
+
       }
     })
 
@@ -453,6 +457,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
     })
 
     observeEvent(input$confirm, {
+      shinyalert("Remember to click [quit] to save your confirmed labels!")
       ids.selected = as.numeric(input$Plot1_selected)
       if (is.factor(df[[input$featureInput]])) {
         levs = levels(df[[input$featureInput]])
@@ -470,14 +475,13 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         df.backup[[input$featureInput]][which(df.backup$id %in% ids.selected)] = input$labelInput
       }
       session$sendCustomMessage(type = "Plot1_set", message = character(0))
-      shinyalert("Remember to click [quit] to save your confirmed labels!")
     })
 
     observe({
 
       if (input$stopApp > 0) {
         print("Stopped")
-        spots.df = df$barcode
+        spots.df = df.backup$barcode
         spots.seurat = rownames(seurat@meta.data)
 
         # this function does not change the raw columns of seurat but add another renamed column!
@@ -485,10 +489,10 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
           if (is.factor(seurat@meta.data[[i]])) {
             levs = levels(droplevels(seurat@meta.data[[i]]))
             seurat@meta.data[[i]] = as.character(seurat@meta.data[[i]])
-            seurat@meta.data[[i]][spots.seurat %in% spots.df] = as.character(df[[i]])
-            seurat@meta.data[[i]] = factor(seurat@meta.data[[i]], levels = c(levs, levels(df[[i]])[!levels(df[[i]]) %in% levs]))
+            seurat@meta.data[[i]][spots.seurat %in% spots.df] = as.character(df.backup[[i]])
+            seurat@meta.data[[i]] = factor(seurat@meta.data[[i]], levels = c(levs, levels(df.backup[[i]])[!levels(df.backup[[i]]) %in% levs]))
           } else {
-            seurat@meta.data[[i]][spots.seurat %in% spots.df] = df[[i]]
+            seurat@meta.data[[i]][spots.seurat %in% spots.df] = df.backup[[i]]
           }
         }
 
