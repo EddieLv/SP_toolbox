@@ -395,7 +395,6 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
       for (i in names(df)) {
         df[[i]] = df.backup[[i]]
       }
-      selected$selected.ids = c()
     })
 
     observeEvent(input$vertical, {
@@ -471,6 +470,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         df.backup[[input$featureInput]][which(df.backup$id %in% ids.selected)] = input$labelInput
       }
       session$sendCustomMessage(type = "Plot1_set", message = character(0))
+      shinyalert("Remember to click [quit] to save your confirmed labels!")
     })
 
     observe({
