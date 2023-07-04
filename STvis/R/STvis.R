@@ -463,12 +463,12 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
         levs = levels(df[[input$featureInput]])
         df[[input$featureInput]] = as.character(df[[input$featureInput]])
         df[[input$featureInput]][which(df$id %in% ids.selected)] = input$labelInput
-        df[[input$featureInput]] = factor(df[[input$featureInput]], levels = unique(levs, input$labelInput))
+        df[[input$featureInput]] = factor(df[[input$featureInput]], levels = unique(c(levs, input$labelInput)))
 
         levs = levels(df.backup[[input$featureInput]])
         df.backup[[input$featureInput]] = as.character(df.backup[[input$featureInput]])
         df.backup[[input$featureInput]][which(df.backup$id %in% ids.selected)] = input$labelInput
-        df.backup[[input$featureInput]] = factor(df.backup[[input$featureInput]], levels = unique(levs, input$labelInput))
+        df.backup[[input$featureInput]] = factor(df.backup[[input$featureInput]], levels = unique(c(levs, input$labelInput)))
       } else {
         df[[input$featureInput]][which(df$id %in% ids.selected)] = input$labelInput
 
