@@ -223,9 +223,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
 
                                       fluidRow(
                                         column(width = 6,
-                                               sliderInput(inputId = "alphaValue", label = "Spot.alpha [0-1]", min = 0, max = 1, value = 0.8, step = 0.05)),
+                                               sliderInput(inputId = "alphaValue", label = "Spot.alpha [0-1]", min = 0, max = 1, value = 0.8, step = 0.01)),
                                         column(width = 6,
-                                               sliderInput(inputId = "spotSize", label = "Spot.size [0-1]", min = 0, max = 1, value = 0.1, step = 0.05))), shiny::hr(),
+                                               sliderInput(inputId = "spotSize", label = "Spot.size [0-1]", min = 0, max = 1, value = 0.1, step = 0.01))), shiny::hr(),
 
                                       fluidRow(
                                         column(width = 6,
