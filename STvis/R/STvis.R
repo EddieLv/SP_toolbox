@@ -538,7 +538,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
           }
         }
 
-        seurat@meta.data[["ai.filter"]][spots.seurat %in% spots.df] = df.backup[["ai.filter"]]
+        if ("ai.filter" %in% names(df.backup)) {
+          seurat@meta.data[["ai.filter"]][spots.seurat %in% spots.df] = df.backup[["ai.filter"]]
+        }
 
         if (exists("seurat.backup")) {
           for (i in colnames(seurat.backup@meta.data)) {
@@ -552,8 +554,11 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
             }
           }
 
-          seurat.backup@meta.data[["ai.filter"]] = "exist"
-          seurat.backup@meta.data[rownames(seurat@meta.data), "ai.filter"] = seurat@meta.data[ , "ai.filter"]
+          if ("ai.filter" %in% names(df.backup)) {
+            seurat.backup@meta.data[["ai.filter"]] = "exist"
+            seurat.backup@meta.data[rownames(seurat@meta.data), "ai.filter"] = seurat@meta.data[ , "ai.filter"]
+          }
+
           stopApp(returnValue = seurat.backup)
         } else {
           stopApp(returnValue = seurat)
