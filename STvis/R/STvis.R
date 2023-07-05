@@ -17,7 +17,7 @@ library(ggplot2)
 library(viridis)
 library(grid)
 
-shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
+shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_env = NULL, script = NULL) {
   DefaultAssay(seurat) = assay
 
   move.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.num = 0, y.num = 0) {
@@ -198,10 +198,36 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
     return(list(annotation, coordinates, img))
   }
 
+  ai.filter = function(image = NULL, df = NULL, python_env = NULL, script = NULL, barcodeNum = NULL, thre = NULL, prefix = NULL) {
+    writePNG(image, target = paste(getwd(), "STvis.AI.filter.genger.temp.png", sep = "/"))
+    system(paste(python_env, script,
+                 paste0("--img=", paste(getwd(), "STvis.AI.filter.genger.temp.png", sep = "/")),
+                 paste0("--barcodeNum=", barcodeNum),
+                 paste0("--thre=", thre), sep = " "))
+    ai.filtered.pixels = read.csv(paste(getwd(), "STvis.AI.filter.genger.filterd.pixels.csv", sep = "/"), header = F)
+    colnames(ai.filtered.pixels) = "barcode"
+    ai.filtered.pixels$barcodeB = str_split(ai.filtered.pixels$barcode, "x", simplify = T)[ , 1]
+    ai.filtered.pixels$barcodeA = str_split(ai.filtered.pixels$barcode, "x", simplify = T)[ , 2]
+    ai.filtered.pixels$barcodeA = barcodeNum + 1 - as.numeric(ai.filtered.pixels$barcodeA)
+    ai.filtered.pixels$barcode.use = paste0(ai.filtered.pixels$barcodeA, "x", ai.filtered.pixels$barcodeB)
+
+    # add important feature!
+    df[["ai.filter"]][df[["barcode"]] %in% paste0(prefix, ai.filtered.pixels$barcode.use)] = "fitered"
+
+    return(df[["ai.filter"]])
+  }
+
+
   ui = dashboardPage(dashboardHeader(title = tags$div(style = "white-space: pre-wrap; word-wrap: break-word; line-height: 1.2;",
                                                       "ST Visualization Tool (STvis v1.0.0)\n---please watch the [Instructions] first---"), titleWidth = 450),
                      dashboardSidebar(width = 600,
                                       actionButton(inputId = "info", label = "Instructions"), shiny::hr(),
+
+                                      fluidRow(
+                                        tags$div(
+                                          style = "display: flex; align-items: center;",
+                                          sliderInput(inputId = "thre", label = "threshold for filtering [0-100]", min = 0, max = 100, value = 50, step = 1, width = "60%"),
+                                          actionButton(inputId = "ai.ok", label = "Power BY AI", width = "20%"))), shiny::hr(),
 
                                       fluidRow(
                                         column(width = 4,
@@ -328,10 +354,11 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
     #   seurat@meta.data[is.null(seurat[[i]]), i] = "STvis"
     # }
 
-    prefix = ifelse(all(str_detect(colnames(seurat), sampleChoice[1])), paste0(sampleChoice[1], "_"), "")
+    clean.barcodes = str_match(colnames(seurat), pattern = "\\d+x\\d+")[ , 1]
+    prefix = gsub(clean.barcodes[1], "", colnames(seurat)[1])
     # add important feature!
-    seurat$barcodeB = str_split(gsub(prefix, "", colnames(seurat)), "x", simplify = T)[ , 1]
-    seurat$barcodeA = str_split(gsub(prefix, "", colnames(seurat)), "x", simplify = T)[ , 2]
+    seurat$barcodeB = str_split(clean.barcodes, "x", simplify = T)[ , 1]
+    seurat$barcodeA = str_split(clean.barcodes, "x", simplify = T)[ , 2]
     seurat$id = 1:dim(seurat)[2]
 
     updateSelectInput(session, inputId = "sampleInput", label = "Select sample", choices = sampleChoice, selected = sampleChoice[1])
@@ -454,6 +481,19 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL) {
                                         opts_hover_key(css = "stroke:black;r:5pt;cursor:pointer;"))
                      x
                    })
+    })
+
+    observeEvent(input$ai.ok, {
+      df[["ai.filter"]] = rep("exist", length(df[["id"]]))
+      df.backup[["ai.filter"]] = rep("exist", length(df.backup[["id"]]))
+      featureChoice = unique(c(featureChoice, "ai.filter"))
+      updateSelectInput(session, inputId = "featureInput", label = "Select feature", choices = featureChoice, selected = "ai.filter")
+      updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = featureChoice, selected = "ai.filter")
+
+      df[["ai.filter"]] = ai.filter(rv$ann[[3]], df, python_env = python_env, script = script, barcodeNum = ifelse(max(seurat$barcodeB) > 50, 96, 50), thre = input$thre, prefix = prefix)
+      df.backup[["ai.filter"]] = ai.filter(rv$ann[[3]], df.backup, python_env = python_env, script = script, barcodeNum = ifelse(max(seurat$barcodeB) > 50, 96, 50), thre = input$thre, prefix = prefix)
+
+      session$sendCustomMessage(type = "Plot1_set", message = character(0))
     })
 
     observeEvent(input$confirm, {
