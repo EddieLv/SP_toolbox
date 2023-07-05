@@ -212,7 +212,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     ai.filtered.pixels$barcode.use = paste0(ai.filtered.pixels$barcodeA, "x", ai.filtered.pixels$barcodeB)
 
     # add important feature!
-    df[["ai.filter"]][df[["barcode"]] %in% paste0(prefix, ai.filtered.pixels$barcode.use)] = "fitered"
+    df[["ai.filter"]][df[["barcode"]] %in% paste0(prefix, ai.filtered.pixels$barcode.use)] = "filtered"
 
     return(df[["ai.filter"]])
   }
@@ -249,9 +249,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
 
                                       fluidRow(
                                         column(width = 6,
-                                               sliderInput(inputId = "alphaValue", label = "Spot.alpha [0-1]", min = 0, max = 1, value = 0.8, step = 0.05)),
+                                               sliderInput(inputId = "alphaValue", label = "Spot.alpha [0-1]", min = 0, max = 1, value = 0.8, step = 0.01)),
                                         column(width = 6,
-                                               sliderInput(inputId = "spotSize", label = "Spot.size [0-1]", min = 0, max = 1, value = 0.1, step = 0.05))), shiny::hr(),
+                                               sliderInput(inputId = "spotSize", label = "Spot.size [0-1]", min = 0, max = 1, value = 0.1, step = 0.01))), shiny::hr(),
 
                                       fluidRow(
                                         column(width = 6,
@@ -524,6 +524,8 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
         spots.df = df.backup$barcode
         spots.seurat = rownames(seurat@meta.data)
 
+        featureChoice = featureChoice[!featureChoice %in% c("barcodeB", "barcodeA", "id")]
+
         # this function does not change the raw columns of seurat but add another renamed column!
         for (i in featureChoice) {
           if (is.factor(seurat@meta.data[[i]])) {
@@ -536,6 +538,8 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
           }
         }
 
+        seurat@meta.data[["ai.filter"]][spots.seurat %in% spots.df] = df.backup[["ai.filter"]]
+
         if (exists("seurat.backup")) {
           for (i in colnames(seurat.backup@meta.data)) {
             if (is.factor(seurat@meta.data[[i]])) {
@@ -547,6 +551,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
               seurat.backup@meta.data[rownames(seurat@meta.data), i] = seurat@meta.data[ , i]
             }
           }
+
+          seurat.backup@meta.data[["ai.filter"]] = "exist"
+          seurat.backup@meta.data[rownames(seurat@meta.data), "ai.filter"] = seurat@meta.data[ , "ai.filter"]
           stopApp(returnValue = seurat.backup)
         } else {
           stopApp(returnValue = seurat)
