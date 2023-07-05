@@ -204,7 +204,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
                  paste0("--img=", paste(getwd(), "STvis.AI.filter.genger.temp.png", sep = "/")),
                  paste0("--barcodeNum=", barcodeNum),
                  paste0("--thre=", thre), sep = " "))
-    ai.filtered.pixels = read.csv(paste(getwd(), "STvis.AI.filter.genger.filterd.pixels.csv", sep = "/"), header = F)
+    ai.filtered.pixels = read.csv(paste("~/STvis.AI.filter.genger.filterd.pixels.csv", sep = "/"), header = F)
     colnames(ai.filtered.pixels) = "barcode"
     ai.filtered.pixels$barcodeB = str_split(ai.filtered.pixels$barcode, "x", simplify = T)[ , 1]
     ai.filtered.pixels$barcodeA = str_split(ai.filtered.pixels$barcode, "x", simplify = T)[ , 2]
