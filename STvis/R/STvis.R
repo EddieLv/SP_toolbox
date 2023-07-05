@@ -155,7 +155,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
       cols = colorRampPalette(colors = rev(x = brewer.pal(n = 11, name = "Spectral")))(100)
       p = ggplot(coordinates, aes(x = x, y = y, data_id = id, tooltip = round(feature, 3))) +
         annotation +
-        geom_point_interactive(aes(fill = feature, alpha = feature), size = pt.size, shape = shape, stroke = 0) +
+        geom_point_interactive(aes(fill = feature, alpha = feature), size = pt.size, shape = shape, stroke = NA, color = "black") +
         scale_fill_gradientn(colors = cols) +
         scale_alpha(range = c(alpha, 1)) +
         ylim(nrow(img), 0) + xlim(0, ncol(img)) +
@@ -164,12 +164,17 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
         guides(alpha = "none") +
         labs(fill = show.feature)
     } else {
-      cols = c("#F6222EFF", "#E4E1E3FF", "#5A5156FF", "#FE00FAFF", "#16FF32FF", "#3283FEFF", "#FEAF16FF", "#B00068FF", "#1CFFCEFF", "#90AD1CFF", "#2ED9FFFF", "#DEA0FDFF", "#AA0DFEFF",
+      cols = c("#F6222EFF", "#5A5156FF", "#E4E1E3FF", "#FE00FAFF", "#16FF32FF", "#3283FEFF", "#FEAF16FF", "#B00068FF", "#1CFFCEFF", "#90AD1CFF", "#2ED9FFFF", "#DEA0FDFF", "#AA0DFEFF",
                "#F8A19FFF", "#325A9BFF", "#C4451CFF", "#1C8356FF", "#85660DFF", "#B10DA1FF", "#FBE426FF", "#1CBE4FFF", "#FA0087FF", "#FC1CBFFF", "#F7E1A0FF", "#C075A6FF", "#782AB6FF",
                "#AAF400FF", "#BDCDFFFF", "#822E1CFF", "#B5EFB5FF", "#7ED7D1FF", "#1C7F93FF", "#D85FF7FF", "#683B79FF", "#66B0FFFF", "#3B00FBFF")
+      # only for AI filtering
+      if (length(unique(coordinates$feature)) == 1  & unique(coordinates$feature)[1] == "filtered") {
+        shape = 0
+      }
+
       p = ggplot(coordinates, aes(x = x, y = y, data_id = id, tooltip = feature)) +
         annotation +
-        geom_point_interactive(aes(fill = feature), size = pt.size, shape = shape, stroke = 0, alpha = alpha) +
+        geom_point_interactive(aes(fill = feature), size = pt.size, shape = shape, stroke = 0.1, alpha = alpha, color = "black") +
         ylim(nrow(img), 0) + xlim(0, ncol(img)) +
         theme_void() + coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = F, clip = "on") +
         theme(aspect.ratio = 1, legend.spacing.y = unit(0, "cm"), plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
@@ -399,6 +404,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
       updateSelectInput(session, inputId = "subsetFeature", label = "Select feature to subset", choices = names(df), selected = "orig.ident")
     })
 
+    cols = reactiveValues(selected.fill = "transparent")
     observeEvent(input$subset.ok, {
       subset.features = strsplit(input$subsetString, split = ",")[[1]]
 
@@ -420,6 +426,11 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
         df[[input$subsetFeature]] = df.backup[[input$subsetFeature]][df.backup[[input$subsetFeature]] %in% subset.features]
 
       }
+
+      if (length(subset.features) == 1 & subset.features == "filtered") {
+        cols$selected.fill = "#FFB6C1"
+      }
+
     })
 
     observeEvent(input$recover.ok, {
@@ -460,7 +471,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
       withProgress(message = "Updating plot", value = 0,
                    {
                      df.tmp = as.data.frame(reactiveValuesToList(df))
-
+                     print(cols$selected.fill)
                      x = girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10,
                                                                 shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "orig.ident", input$featureInput)),
                                 width_svg = 12, height_svg = 10)
@@ -475,7 +486,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
                                                           zoom_reset = "recover",
                                                           saveaspng = "download png"),
                                                      hidden = c("lasso_deselect", "zoom_rect")),
-                                        opts_selection(type = "multiple", css = "fill:transparent;stroke:transparent;"),
+                                        opts_selection(type = "multiple", css = paste0("fill:", cols$selected.fill, ";stroke:transparent;stroke-width:0.1px")),
                                         opts_selection_key(css = "stroke:black;r:1pt;"),
                                         opts_hover(css = "fill:wheat;stroke:black;stroke-width:1px;cursor:pointer;"),
                                         opts_hover_key(css = "stroke:black;r:5pt;cursor:pointer;"))
