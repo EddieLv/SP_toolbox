@@ -140,7 +140,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
                coordinates = tissue.positions, spot.radius = spot.radius))
   }
 
-  make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.size = 0.1, shape = 22, show.feature = NULL) {
+  make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.size = 0.1, shape = 22, show.feature = NULL, mode = NULL) {
     annotation = ann[[1]]
     coordinates = ann[[2]]
     img = ann[[3]]
@@ -168,7 +168,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
                "#F8A19FFF", "#325A9BFF", "#C4451CFF", "#1C8356FF", "#85660DFF", "#B10DA1FF", "#FBE426FF", "#1CBE4FFF", "#FA0087FF", "#FC1CBFFF", "#F7E1A0FF", "#C075A6FF", "#782AB6FF",
                "#AAF400FF", "#BDCDFFFF", "#822E1CFF", "#B5EFB5FF", "#7ED7D1FF", "#1C7F93FF", "#D85FF7FF", "#683B79FF", "#66B0FFFF", "#3B00FBFF")
       # only for AI filtering
-      if (length(unique(coordinates$feature)) == 1  & unique(coordinates$feature)[1] == "filtered") {
+      if (mode == "on") {
         shape = 0
       }
 
@@ -232,7 +232,8 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
                                         tags$div(
                                           style = "display: flex; align-items: center;",
                                           sliderInput(inputId = "thre", label = "threshold for filtering [0-100]", min = 0, max = 100, value = 50, step = 1, width = "60%"),
-                                          actionButton(inputId = "ai.ok", label = "Power BY AI", width = "20%"))), shiny::hr(),
+                                          actionButton(inputId = "ai.ok", label = "Power BY AI", width = "20%"),
+                                          selectInput(inputId = "filter.mode", label = "Filter mode", choices = c("on", "off"), selected = "off", width = "20%"))), shiny::hr(),
 
                                       fluidRow(
                                         column(width = 4,
@@ -427,10 +428,6 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
 
       }
 
-      if (length(subset.features) == 1 & subset.features == "filtered") {
-        cols$selected.fill = "#FFB6C1"
-      }
-
     })
 
     observeEvent(input$recover.ok, {
@@ -471,8 +468,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
       withProgress(message = "Updating plot", value = 0,
                    {
                      df.tmp = as.data.frame(reactiveValuesToList(df))
-                     print(cols$selected.fill)
-                     x = girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10,
+                     x = girafe(ggobj = make.feature.plot.shiny(ann = rv$ann, anno.df = df.tmp, alpha = input$alphaValue, pt.size = input$spotSize*10, mode = input$filter.mode,
                                                                 shape = as.integer(input$shapeInput), show.feature = ifelse(is.null(input$featureInput), "orig.ident", input$featureInput)),
                                 width_svg = 12, height_svg = 10)
                      x = girafe_options(x,
@@ -531,7 +527,6 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     observe({
 
       if (input$stopApp > 0) {
-        print("Stopped")
         spots.df = df.backup$barcode
         spots.seurat = rownames(seurat@meta.data)
 
