@@ -5,6 +5,7 @@ library(shinydashboard)
 library(png)
 library(tools)
 library(DT)
+library(ggnewscale)
 
 library(Seurat)
 library(dplyr)
@@ -17,74 +18,225 @@ library(ggplot2)
 library(viridis)
 library(grid)
 
+move.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.num = 0, y.num = 0) {
+  # 定义旋转角度和旋转中心坐标
+  n.min = (1 - 0.5) * 1080 / numBarcode
+
+  df.old = df
+  # 赋值时x y对调
+  df[, y] = df.old[, y] + y.num*n.min
+  df[, x] = df.old[, x] + x.num*n.min
+
+  return(df)
+}
+
+shrink.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.scale.factor = 1, y.scale.factor = 1) {
+
+  df.old = df
+  # 赋值时x y对调
+  df[, y] = df.old[, y]*y.scale.factor
+  df[, x] = df.old[, x]*x.scale.factor
+
+  return(df)
+}
+
+rotate.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, angle = 0) {
+  rad = angle * pi / 180
+
+  # 定义旋转角度和旋转中心坐标
+  n.min = (1 - 0.5) * 1080 / numBarcode
+  n.max = (numBarcode - 0.5) * 1080 / numBarcode
+  n.mid = (n.min + n.max) / 2
+  center = c(n.mid, n.mid)
+
+  df.old = df
+  # 赋值时x y对调
+  df[, y] = (df.old[, y] - center[2]) * cos(rad) - (df.old[, x] - center[1]) * sin(rad) + center[1] # y1 = y*cos(β) - x*sin(β)
+  df[, x] = (df.old[, x] - center[1]) * cos(rad) + (df.old[, y] - center[2]) * sin(rad) + center[2] # x1 = x*cos(β) + y*sin(β)
+
+  return(df)
+}
+
+flip.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, horizontal = F, vertical = F) {
+  # (numBarcode + 1 - 0.5 - iA) * 1080 / numBarcode
+  n.min = (1 - 0.5) * 1080 / numBarcode
+  n.max = (numBarcode - 0.5) * 1080 / numBarcode
+
+  df.old = df
+  if (horizontal) {
+    if (numBarcode == 50) {
+      df[, y] = n.max - df.old[, y] + n.min
+    }
+    if (numBarcode == 96) {
+      df[, y] = n.max - df.old[, y] + n.min
+    }
+  }
+
+  if (vertical) {
+    if (numBarcode == 50) {
+      df[, x] = n.max - df.old[, x] + n.min
+    }
+    if (numBarcode == 96) {
+      df[, x] = n.max - df.old[, x] + n.min
+    }
+  }
+
+  return(df)
+}
+
+create.trian.coord = function(pairs, type = "up", shrink = 1) {
+  if (type == "up") {
+    x = c(0, 0, 1) * shrink
+    y = c(0, 1, 1) * shrink
+  }
+  if (type == "low") {
+    x = c(0, 1, 1) * shrink
+    y = c(0, 0, 1) * shrink
+  }
+
+  mat = do.call(
+    rbind,
+    apply(pairs, 1, function (row) {
+      a = row[1]
+      b = row[2]
+      data.frame(
+        x = x + a,
+        y = y + b,
+        group = paste(a, b, sep = "-")
+      )
+    }))
+
+  return(mat)
+}
+
+Spatial2Featureplot_genger = function(seurat, orig.ident = NULL, image = NULL, show.image = F, shrink = 1, featureA = NULL, featureB = NULL, colA = NULL, colB = NULL, show.label = T, theme.dark = F) {
+  meta.df = seurat@meta.data[seurat$orig.ident == orig.ident, ]
+
+  numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50)
+
+  if (is.null(colA)) {
+    if (theme.dark) {
+      colA = viridis(100, option = "D")
+    } else {
+      colA = RColorBrewer::brewer.pal(9, "Reds")
+    }
+  }
+  if (is.null(colB)) {
+    if (theme.dark) {
+      colB = viridis(100, option = "F")
+    } else {
+      colB = RColorBrewer::brewer.pal(9, "Blues")
+    }
+  }
+
+  if (theme.dark) {
+    boarder.col = "white"
+  } else {
+    boarder.col = "grey"
+  }
+
+  pairs = merge(1:numBarcode, 1:numBarcode)
+  # get up-triangle coordinates
+  upper = create.trian.coord(pairs, type = "up", shrink = shrink)
+  colnames(upper) = c(paste0("up.", colnames(upper)[1:2]), "group")
+  # get down-triangle coordinates
+  lower = create.trian.coord(pairs, type = "low", shrink = shrink)[1:2]
+  colnames(lower) = paste0("low.", colnames(lower))
+  # combine
+  upper_lower = cbind(upper, lower)
+  upper_lower$cell = gsub("-", "x", upper_lower$group)
+  upper_lower$cell.up = paste0(upper_lower$up.x, "x", upper_lower$up.y)
+  upper_lower$cell.low = paste0(upper_lower$low.x, "x", upper_lower$low.y)
+
+  # add spatial coordinates
+  coordinates = data.frame(iB = rep(seq(1, numBarcode + 1, 1*shrink), each = length(seq(1, numBarcode + 1, 1*0.1))),
+                           iA = rep(seq(1, numBarcode + 1, 1*shrink), times = length(seq(1, numBarcode + 1, 1*0.1)))) %>%
+    mutate(imagerow = (numBarcode + 1 - iB) * 1080 / numBarcode,
+           imagecol = (iA - 1) * 1080 / numBarcode)
+  coordinates$cell = paste0(coordinates$iB, "x", coordinates$iA)
+  coordinates[ , c("imagerow", "imagecol")] = coordinates[ , c("imagerow", "imagecol")] %>%
+    mutate(imagerow = imagerow * seurat@images[[image]]@scale.factors$lowres,
+           imagecol = imagecol * seurat@images[[image]]@scale.factors$lowres) %>%
+    rotate.axis.shiny(x = "imagerow", y = "imagecol", numBarcode = numBarcode, angle = 90) %>%
+    flip.axis.shiny(x = "imagerow", y = "imagecol", numBarcode = numBarcode, horizontal = T)
+  imagre.row = coordinates$imagerow; names(imagre.row) = coordinates$cell
+  imagre.col = coordinates$imagecol; names(imagre.col) = coordinates$cell
+
+  upper_lower$up.x.image = unname(imagre.row[upper_lower$cell.up])
+  upper_lower$up.y.image = unname(imagre.col[upper_lower$cell.up])
+  upper_lower$low.x.image = unname(imagre.row[upper_lower$cell.low])
+  upper_lower$low.y.image = unname(imagre.col[upper_lower$cell.low])
+
+  clean.barcodes = str_match(rownames(meta.df), pattern = "\\d+x\\d+")[ , 1]
+  prefix = gsub(clean.barcodes[1], "", rownames(meta.df)[1])
+  df = meta.df %>%
+    rownames_to_column(var = "barcode") %>%
+    mutate("cell" = gsub(prefix, "", barcode))
+
+  df.res = merge(upper_lower, df, by = "cell", all.x = T) %>% na.omit()
+
+  img = seurat@images[[image]]@image
+  img_grob = grid::rasterGrob(img, interpolate = FALSE, width = grid::unit(1, "npc"), height = grid::unit(1, "npc"))
+
+  if (show.image) {
+    p = ggplot(df.res) +
+      annotation_custom(grob = img_grob, xmin = 0, xmax = ncol(img), ymin = 0, ymax = -nrow(img)) +
+      geom_polygon(aes(up.x.image, up.y.image, fill = !!as.name(featureA), group = group), colour = boarder.col, linewidth = shrink*0.5) +
+      scale_fill_gradientn(colors = colA) +
+      new_scale_fill() +
+      geom_polygon(aes(low.x.image, low.y.image, fill = !!as.name(featureB), group = group), colour = boarder.col, linewidth = shrink*0.5) +
+      scale_fill_gradientn(colours = colB) +
+      coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = T, clip = "on") +
+      ylim(nrow(img), 0) + xlim(0, ncol(img)) +
+      theme_void() +
+      theme(legend.position = "top",
+            aspect.ratio = 1)
+  } else {
+    df.res[ , c("up.x.image", "up.y.image")] = df.res[ , c("up.x.image", "up.y.image")] %>% flip.axis.shiny(x = "up.x.image", y = "up.y.image", numBarcode = numBarcode, horizontal = T)
+    df.res[ , c("low.x.image", "low.y.image")] = df.res[ , c("low.x.image", "low.y.image")] %>% flip.axis.shiny(x = "low.x.image", y = "low.y.image", numBarcode = numBarcode, horizontal = T)
+    p = ggplot(df.res) +
+      geom_polygon(aes(up.x.image, up.y.image, fill = !!as.name(featureA), group = group), colour = boarder.col, linewidth = shrink*0.5) +
+      scale_fill_gradientn(colors = colA) +
+      new_scale_fill() +
+      geom_polygon(aes(low.x.image, low.y.image, fill = !!as.name(featureB), group = group), colour = boarder.col, linewidth = shrink*0.5) +
+      scale_fill_gradientn(colours = colB) +
+      scale_x_continuous(expand = c(0, 0), breaks = sort(unique(coordinates$imagecol)) + 5.625, labels = 1:(numBarcode + 1), limits = c(0, 1080), sec.axis = dup_axis()) +
+      scale_y_continuous(expand = c(0, 0), breaks = sort(unique(coordinates$imagecol)) + 5.625, labels = 1:(numBarcode + 1), limits = c(0, 1080), sec.axis = dup_axis()) +
+      theme_void() +
+      theme(legend.position = "top",
+            aspect.ratio = 1,
+            panel.border = element_blank(),
+            axis.line.x = element_line(color = "black", linewidth = 0.5, linetype = "solid"),
+            axis.line.y = element_line(color = "black", linewidth = 0.5, linetype = "solid"),
+            axis.ticks.x = element_blank(),
+            axis.ticks.y = element_blank(),
+            axis.text.x = element_blank(),
+            axis.text.y = element_blank())
+  }
+
+
+  if (show.label & !show.image) {
+    p = p +
+      theme(axis.ticks.length = unit(0.1, "cm"),
+            axis.ticks.x = element_line(color = "black", linewidth = 0.3, linetype = "solid"),
+            axis.ticks.y = element_line(color = "black", linewidth = 0.3, linetype = "solid"),
+            axis.text.x = element_text(size = 8, colour = "black", angle = 270, hjust = 0.5, vjust = 0.5),
+            axis.text.y = element_text(size = 8, colour = "black", angle = 0, hjust = 0.5, vjust = 0.5),
+            axis.text.x.top = element_blank(),
+            axis.ticks.x.top = element_blank(),
+            axis.text.y.left = element_blank(),
+            axis.ticks.y.left = element_blank())
+  }
+
+  if (theme.dark) {
+    p = p + theme(panel.background = element_rect(fill = "black"))
+  }
+
+  return(p)
+}
+
 shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_env = NULL, script = NULL) {
   DefaultAssay(seurat) = assay
-
-  move.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.num = 0, y.num = 0) {
-    # 定义旋转角度和旋转中心坐标
-    n.min = (1 - 0.5) * 1080 / numBarcode
-
-    df.old = df
-    # 赋值时x y对调
-    df[, y] = df.old[, y] + y.num*n.min
-    df[, x] = df.old[, x] + x.num*n.min
-
-    return(df)
-  }
-
-  shrink.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.scale.factor = 1, y.scale.factor = 1) {
-
-    df.old = df
-    # 赋值时x y对调
-    df[, y] = df.old[, y]*y.scale.factor
-    df[, x] = df.old[, x]*x.scale.factor
-
-    return(df)
-  }
-
-  rotate.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, angle = 0) {
-    rad = angle * pi / 180
-
-    # 定义旋转角度和旋转中心坐标
-    n.min = (1 - 0.5) * 1080 / numBarcode
-    n.max = (numBarcode - 0.5) * 1080 / numBarcode
-    n.mid = (n.min + n.max) / 2
-    center = c(n.mid, n.mid)
-
-    df.old = df
-    # 赋值时x y对调
-    df[, y] = (df.old[, y] - center[2]) * cos(rad) - (df.old[, x] - center[1]) * sin(rad) + center[1] # y1 = y*cos(β) - x*sin(β)
-    df[, x] = (df.old[, x] - center[1]) * cos(rad) + (df.old[, y] - center[2]) * sin(rad) + center[2] # x1 = x*cos(β) + y*sin(β)
-
-    return(df)
-  }
-
-  flip.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, horizontal = F, vertical = F) {
-    # (numBarcode + 1 - 0.5 - iA) * 1080 / numBarcode
-    n.min = (1 - 0.5) * 1080 / numBarcode
-    n.max = (numBarcode - 0.5) * 1080 / numBarcode
-
-    df.old = df
-    if (horizontal) {
-      if (numBarcode == 50) {
-        df[, y] = n.max - df.old[, y] + n.min
-      }
-      if (numBarcode == 96) {
-        df[, y] = n.max - df.old[, y] + n.min
-      }
-    }
-
-    if (vertical) {
-      if (numBarcode == 50) {
-        df[, x] = n.max - df.old[, x] + n.min
-      }
-      if (numBarcode == 96) {
-        df[, x] = n.max - df.old[, x] + n.min
-      }
-    }
-
-    return(df)
-  }
 
   create_tissue_position.shiny = function(numBarcode) {
 
