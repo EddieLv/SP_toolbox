@@ -259,7 +259,7 @@ get_LR_expr_score = function(count.m, nei_cells = NULL, lr.df = NULL) {
   return(lr.df)
 }
 
-run_st_neighbor_chat_genger = function(seurat, neighbor.res = NULL, lr.df = NULL, assay = "SCT", slot = "data", label.col = NULL, celltype_pair = c("celltypeA", "celltyeB"), nperm = 2000, both.expr = T) {
+run_st_neighbor_chat_genger = function(seurat, neighbor.res = NULL, lr.df = NULL, assay = "SCT", slot = "data", label.col = NULL, celltype_pair = c("celltypeA", "celltyeB"), nperm = 2000) {
   DefaultAssay(seurat) = assay
   meta.df = seurat@meta.data %>% rownames_to_column(var = "cell")
   expr.mat = as.matrix(GetAssayData(seurat, slot = slot))
