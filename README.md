@@ -51,6 +51,7 @@ result.df %>% dplyr::filter(pval < 0.05 & min.expr > 0.1) %>% arrange(pval)
 #3 Sema3a   Plxna1   AT1.pre_AT1                1.16676683                  0.09644369 0.6316053 0.1120997 0.02375
 #4  Lamc2    Itga3   AT1.pre_AT1                0.33471254                  0.17916934 0.2569409 0.1286032 0.03000
 ```
+```
 srat.merge$Vegfa.expr = FetchData(srat.merge, vars = "Vegfa", slot = "data")[[1]]
 srat.merge$Nrp2.expr = FetchData(srat.merge, vars = "Nrp2", slot = "data")[[1]]
 Spatial2Featureplot_genger(srat.merge, orig.ident = "E16.5_slice18", image = "E16.5_slice18", show.image = F, featureA = "Vegfa.expr", featureB = "Nrp2.expr", show.label = T, theme.dark = F)
