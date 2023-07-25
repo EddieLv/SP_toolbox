@@ -32,6 +32,14 @@ st_celltype_pair_neighbor_genger(srat.traj, neighbor.res = neighbor.res, image =
 ```
 ### Load LR-DB and start CCC Analysis  ###
 lr_pair.df = read.table("/media/biogenger/D/LR_database/mouse_ligand_receptors_giotto.txt", header = T, stringsAsFactors = F)
+lr_pair.df %>% head()
+#  ligand receptor
+#1    A2m     Lrp1
+#2  Aanat   Mtnr1a
+#3 Adam12    Itga9
+#4 Adam12    Itgb1
+#5 Adam12     Sdc4
+#6 Adam15    Itga5
 corrected_umi.ls = apply(srat.traj@assays$SCT@data, 1, sum)
 corrected_umi.ls = corrected_umi.ls[corrected_umi.ls > 0]
 lr_pair.df$mouseLigand.exist = ifelse(lr_pair.df$mouseLigand %in% names(corrected_umi.ls), "ligand", "no")
