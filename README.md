@@ -1,6 +1,8 @@
 Wait for Document after published!
 
 ### ST Neighboring Chat ###
+
+```
 sample = "E16.5_slice18"
 srat.merge = readRDS("/media/biogenger/D/Projects/CMY/Analysis/mouse_lung/All/Paper/Fig4/srat.merge.reanno.rds")
 srat.merge = SubsetSTData(srat.merge, spots = rownames(srat.merge@meta.data)[srat.merge$orig.ident == sample])
@@ -28,3 +30,5 @@ colnames(lr_pair.df) = c("ligand", "receptor")
 
 result.df = run_st_neighbor_chat_genger(srat.traj, neighbor.res = neighbor.res, lr.df = lr_pair.df, assay = "SCT", slot = "data", label.col = "celltype.re", celltype_pair = c("AT1.pre", "AT1"), nperm = 2000)
 result.df %>% dplyr::filter(pval < 0.05 & min.expr > 0.1) %>% arrange(pval)
+
+```
