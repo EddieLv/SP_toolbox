@@ -27,4 +27,7 @@ Depends:
     grid,
     RColorBrewer,
     shinyalert,
-    ggnewscale
+    ggnewscale,
+    parallel,
+    reshape2,
+    ggh4x
