@@ -17,6 +17,7 @@ table(srat.merge$celltype.re)
 #Sox9.pro   AT1.pre       AT1   AT2.pre       AT2 Matrix.FB    myo.FB      gCap 
 #      55       802       103       690       226       955       576       646 
 ```
+```
 if (! dir.exists(ccc_path)) dir.create(ccc_path)
 neighbor.res = run_st_neighbor_genger(srat.merge, coordx = "barcodeB", coordy = "barcodeA", label.col = "celltype.re", self.interaction = T, permut = T, nperm = 2000, max.distance = 2)
 st_neighbor_heat_genger(neighbor.res$neighbor.df)
