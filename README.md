@@ -42,6 +42,7 @@ lr_pair.df = lr_pair.df %>% dplyr::filter(lr.exist == "ligand_receptor")
 lr_pair.df = lr_pair.df[ , 1:2]
 colnames(lr_pair.df) = c("ligand", "receptor")
 ```
+```
 result.df = run_st_neighbor_chat_genger(srat.traj, neighbor.res = neighbor.res, lr.df = lr_pair.df, assay = "SCT", slot = "data", label.col = "celltype.re", celltype_pair = c("AT1.pre", "AT1"), nperm = 2000)
 result.df %>% dplyr::filter(pval < 0.05 & min.expr > 0.1) %>% arrange(pval)
 #  ligand receptor celltype_pair ligand_celltype_pair_mean receptor_celltype_pair_mean mean_expr  min.expr    pval
