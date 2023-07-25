@@ -1,6 +1,7 @@
 Wait for Document after published!
 
-### ST Neighboring Chat (repackaged from https://github.com/JohnGenome/ST-mouse-kidney-development) ###
+1. ST Neighboring Chat
+> (repackaged from https://github.com/JohnGenome/ST-mouse-kidney-development)
 ```
 sample = "E16.5_slice18"
 srat.merge = readRDS("/media/biogenger/D/Projects/CMY/Analysis/mouse_lung/All/Paper/Fig4/srat.merge.reanno.rds")
