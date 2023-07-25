@@ -49,15 +49,27 @@ table(lr_pair.df$lr.exist)
 lr_pair.df = lr_pair.df %>% dplyr::filter(lr.exist == "ligand_receptor")
 lr_pair.df = lr_pair.df[ , 1:2]
 colnames(lr_pair.df) = c("ligand", "receptor")
+lr_pair.df$LR = paste0(lr_pair.df$ligand, "_", lr_pair.df$receptor)
 ```
 ```
-result.df = run_st_neighbor_chat_genger(srat.traj, neighbor.res = neighbor.res, lr.df = lr_pair.df, assay = "SCT", slot = "data", label.col = "celltype.re", celltype_pair = c("AT1.pre", "AT1"), nperm = 2000)
-result.df %>% dplyr::filter(pval < 0.05 & min.expr > 0.1) %>% arrange(pval)
-#  ligand receptor celltype_pair ligand_celltype_pair_mean receptor_celltype_pair_mean mean_expr  min.expr    pval
-#1  Vegfa     Nrp2   AT1.pre_AT1                0.20449837                  0.37398822 0.2892433 0.2129601 0.00375
-#2   Fgf1    Fgfr2   AT1.pre_AT1                0.09344202                  1.76577291 0.9296075 0.1065280 0.01100
-#3 Sema3a   Plxna1   AT1.pre_AT1                1.16676683                  0.09644369 0.6316053 0.1120997 0.02375
-#4  Lamc2    Itga3   AT1.pre_AT1                0.33471254                  0.17916934 0.2569409 0.1286032 0.03000
+result.df = run_st_neighbor_chat_genger(srat.merge, neighbor.res = neighbor.res, lr.df = lr_pair.df, assay = "SCT", slot = "data", label.col = "celltype.re", celltype_pair = c("AT1.pre", "myo.FB"), nperm = 2000)
+result.df %>% head()
+result.df %>% dplyr::filter(pval.both < 0.05 & min.expr.both > 0.1) %>% arrange(pval.both)
+result.df %>% dplyr::filter(pval.ind < 0.05 & min.expr.ind > 0.1) %>% arrange(pval.ind)
+#  ligand receptor           LR  celltype_pair ligand_celltype_both_mean receptor_celltype_both_mean ligand_celltype1_mean receptor_celltype2_mean min.expr.both min.expr.ind pval.ligand.both pval.receptor.both
+#1    A2m     Lrp1     A2m_Lrp1 AT1.pre_myo.FB               0.022416981                  0.30527435           0.019948741               0.3688052    0.02241698   0.01994874           0.9950             0.9720
+#2  Aanat   Mtnr1a Aanat_Mtnr1a AT1.pre_myo.FB               0.004674503                  0.00000000           0.006085798               0.0000000    0.00000000   0.00000000           0.3920             0.0000
+#3 Adam12    Itga9 Adam12_Itga9 AT1.pre_myo.FB               0.821827418                  0.78610743           0.796703430               0.9556919    0.78610743   0.79670343           1.0000             0.0000
+#4 Adam12    Itgb1 Adam12_Itgb1 AT1.pre_myo.FB               0.821827418                  0.82841966           0.796703430               0.8369752    0.82182742   0.79670343           1.0000             0.9985
+#5 Adam12     Sdc4  Adam12_Sdc4 AT1.pre_myo.FB               0.821827418                  0.18802907           0.796703430               0.1787223    0.18802907   0.17872231           1.0000             0.6115
+#6 Adam15    Itga5 Adam15_Itga5 AT1.pre_myo.FB               0.035670005                  0.08477808           0.033044533               0.1134542    0.03567000   0.03304453           0.8035             1.0000
+#  pval.both pval.ligand.ind pval.receptor.ind pval.ind
+#1   0.98350           0.989            0.0010  0.49500
+#2   0.19600           0.154            0.0000  0.07700
+#3   0.50000           1.000            0.0000  0.50000
+#4   0.99925           1.000            0.8695  0.93475
+#5   0.80575           1.000            0.7785  0.88925
+#6   0.90175           0.854            0.3355  0.59475
 ```
 ```
 srat.merge$Vegfa.expr = FetchData(srat.merge, vars = "Vegfa", slot = "data")[[1]]
