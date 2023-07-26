@@ -79,4 +79,4 @@ Spatial2Featureplot_genger(srat.merge, orig.ident = "E16.5_slice18", image = "E1
 ![image](https://github.com/EddieLv/STvis/assets/61786787/645b535a-0f5f-49eb-93fd-e82ad584dfe8)
 
 ## Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=star-history/star-history&type=Date)](https://star-history.com/#star-history/star-history&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=EddieLv/STvis&type=Date)](https://star-history.com/#EddieLv/STvis&Date)
