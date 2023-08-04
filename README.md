@@ -78,6 +78,12 @@ Spatial2Featureplot_genger(srat.merge, orig.ident = "E16.5_slice18", image = "E1
 ```
 ![image](https://github.com/EddieLv/STvis/assets/61786787/645b535a-0f5f-49eb-93fd-e82ad584dfe8)
 
-## Star History
+# Stargazers
+	
+[![Stargazers over time](https://starchart.cc/EddieLv/STvis.svg)](https://starchart.cc/EddieLv/STvis)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=EddieLv/STvis&type=Date)](https://star-history.com/#EddieLv/STvis&Date)
+<br><a href="https://github.com/Charmve/computer-vision-in-action#-以用促学先会后懂-"><img align="right" alt="Go for it!" src="https://raw.githubusercontent.com/Charmve/computer-vision-in-action/dd292873828228a753a9bd2de4576dbf8cc3902c/res/ui/footer-rocket.svg" height="220" title="Do what you like, and do it best!"/></a>
+<br>
+<p align="center">Feel free to ask any questions, open a PR if you feel something can be done differently!</p>
+<h2 align="center">🌟 Star this repository 🌟</h2>
+<p align="center">Created by <a href="https://github.com/EddieLv">EddieLv</a></p>
