@@ -701,6 +701,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
         }
 
         if (exists("seurat.backup")) {
+          seurat.backup@images[[image]]@coordinates[ , c("imagerow", "imagecol")] = rv$ann[[2]][ , c("x", "y")] %>%
+            rotate.axis.shiny(x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), angle = 90) %>%
+            flip.axis.shiny(x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), horizontal = T)
           for (i in colnames(seurat.backup@meta.data)) {
             if (is.factor(seurat@meta.data[[i]])) {
               levs = levels(droplevels(seurat.backup@meta.data[[i]]))
@@ -719,6 +722,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
 
           stopApp(returnValue = seurat.backup)
         } else {
+          seurat@images[[image]]@coordinates[ , c("imagerow", "imagecol")] = rv$ann[[2]][ , c("x", "y")] %>%
+            rotate.axis.shiny(x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), angle = 90) %>%
+            flip.axis.shiny(x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB) > 50, 96, 50), horizontal = T)
           stopApp(returnValue = seurat)
         }
 
