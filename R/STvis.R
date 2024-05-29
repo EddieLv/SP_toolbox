@@ -333,26 +333,17 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, isVisium
   server = function(input, output, session) {
     options(shiny.maxRequestSize = 100*1024^2)
     
-    if (is.null(image) & length(Images(seurat)) == 1) {
-      image = Images(seurat)[1]
+    if (is.null(image)) {
+      stop("Please set image!")
     }
     
     if (length(Images(seurat)) > 1) {
       message(paste("Detect", length(Images(seurat)), "images!"))
       seurat.backup = seurat
-      if (!is.null(image)) {
-        seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)), slot = slot)
-        seurat@meta.data = seurat@meta.data[ , colnames(seurat.backup@meta.data)]
-        img = list(seurat@images[[image]]); names(img) = image
-        seurat@images = img
-      } else {
-        warning("Please select your wanted image!")
-        image = Images(seurat.backup)[1]
-        seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)), slot = slot)
-        seurat@meta.data = seurat@meta.data[ , colnames(seurat.backup@meta.data)]
-        img = list(seurat@images[[image]]); names(img) = image
-        seurat@images = img
-      }
+      seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)), slot = slot)
+      seurat@meta.data = seurat@meta.data[ , colnames(seurat.backup@meta.data)]
+      img = list(seurat@images[[image]]); names(img) = image
+      seurat@images = img
     }
     
     if (sum(str_detect(colnames(seurat), "x")) < dim(seurat)[2]) {
