@@ -1,6 +1,4 @@
-################
-# Unpublished! #
-################
+# Unpublished!
 
 # Installation
 devtools::install_github("EddieLv/DBIT_tools")
