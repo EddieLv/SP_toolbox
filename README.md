@@ -1,12 +1,23 @@
-Wait for Document after published!
+################
+# Unpublished! #
+################
 
-1. STvis (tool for interactive spatial cropping)
+# Installation
+devtools::install_github("EddieLv/DBIT_tools")
+
+# Introduction
+Here I developed 3 functions for DBIT-seq data:
+1.shiny_st() # Edit your spot in web freely!
+2.seurat2scanpy() # Transform seurat.object to scanpy.anndata totally (including counts, data, dimreduc, neighbor, spaitla, etc.)!
+3.run_st_neighbor_genger() # Cell communication algorithm based on spatial neighbor!
+
+# 1. shiny_st (tool for interactive spatial cropping)
 ```
 shiny_st(seurat_obj, assay = "SCT", slot = "data", image = "test", python_env = "~/miniconda3/envs/daily/bin/python", script = "~/script/filter_pixel_AI.py")
 ```
 ![image](https://github.com/EddieLv/STvis/assets/61786787/0a7e13cf-8ee4-44d6-9dbb-63c5150bce96)
 
-2. ST Neighboring Chat (tool for spatial cell-cell communication based on neighboring method)
+# 2. ST Neighboring Chat (tool for spatial cell-cell communication based on neighboring method)
 > (repackaged from https://github.com/JohnGenome/ST-mouse-kidney-development)
 ```
 sample = "E16.5_slice18"
