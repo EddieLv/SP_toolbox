@@ -1,7 +1,12 @@
-# Unpublished!
+# ----------------------------
+# --------Unpublished!--------
+# ----------------------------
+
 
 # Installation
+```
 devtools::install_github("EddieLv/DBIT_tools")
+```
 
 # Introduction
 Here I developed 3 functions for DBIT-seq data:
