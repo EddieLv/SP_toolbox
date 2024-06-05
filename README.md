@@ -1,7 +1,6 @@
 # ----------------------------
-# Unpublished!
+# Unpublished work!
 # ----------------------------
-
 
 # Installation
 ```
