@@ -137,3 +137,58 @@ seurat2scanpy = function(seurat, ann.X = "SCT-data", ann.raw.X = "RNA-counts", h
 }
 
 
+rotate.axis = function(df, x = NULL, y = NULL, numBarcode = NULL, angle = 0) {
+  df = as.data.frame(df)
+  
+  rad = angle * pi / 180
+  
+  df[[x]] = as.numeric(df[[x]])
+  df[[y]] = as.numeric(df[[y]])
+  
+  # 定义旋转角度和旋转中心坐标
+  n.min = (1 - 0.5) * 1080 / numBarcode
+  n.max = (numBarcode - 0.5) * 1080 / numBarcode
+  
+  n.mid = (n.min + n.max) / 2
+  center = c(n.mid, n.mid)
+  
+  df.old = df
+  # 赋值时x y对调
+  df[, y] = (df.old[, y] - center[2]) * cos(rad) - (df.old[, x] - center[1]) * sin(rad) + center[1] # y1 = y*cos(β) - x*sin(β)
+  df[, x] = (df.old[, x] - center[1]) * cos(rad) + (df.old[, y] - center[2]) * sin(rad) + center[2] # x1 = x*cos(β) + y*sin(β)
+  
+  return(df)
+}
+
+flip.axis = function(df, x = NULL, y = NULL, numBarcode = NULL, horizontal = F, vertical = F) {
+  df = as.data.frame(df)
+  
+  # (numBarcode + 1 - 0.5 - iA) * 1080 / numBarcode
+  n.min = (1 - 0.5) * 1080 / numBarcode
+  n.max = (numBarcode - 0.5) * 1080 / numBarcode
+
+  df[[x]] = as.numeric(df[[x]])
+  df[[y]] = as.numeric(df[[y]])
+  
+  df.old = df
+  if (horizontal) {
+    if (numBarcode == 50) {
+      df[, y] = n.max - df.old[, y] + n.min
+    }
+    if (numBarcode == 96) {
+      df[, y] = n.max - df.old[, y] + n.min
+    }
+  } 
+  
+  if (vertical) {
+    if (numBarcode == 50) {
+      df[, x] = n.max - df.old[, x] + n.min
+    }
+    if (numBarcode == 96) {
+      df[, x] = n.max - df.old[, x] + n.min
+    }
+  }
+  
+  return(df)
+}
+
