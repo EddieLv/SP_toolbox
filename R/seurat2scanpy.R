@@ -76,7 +76,7 @@ seurat2scanpy = function(seurat, ann.X = "SCT-data", ann.raw.X = "RNA-counts", h
     uns = dict("spatial" = dict())
     # write spatial image
     for (sample in str_sort(unique(seurat$orig.ident))) {
-      temp_path = paste("/home/biogenger/Downloads/", paste0(sample, ".png"), sep = "/")
+      temp_path = paste(paste0(sample, ".png"), sep = "/")
       if (sample %in% unique(seurat$orig.ident)) {
         sample = make.names(sample)
         png::writePNG(seurat@images[[sample]]@image, temp_path)
