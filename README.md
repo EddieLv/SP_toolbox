@@ -4,7 +4,7 @@
 
 # Installation
 ```
-devtools::install_github("EddieLv/DBIT_tools")
+devtools::install_github("EddieLv/SP_toolbox")
 ```
 
 # Introduction
