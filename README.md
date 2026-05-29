@@ -14,9 +14,162 @@ Here I developed 3 functions for DBIT-seq data:
 3.run_st_neighbor_genger() # Cell communication algorithm based on spatial neighbor!
 
 # 1. shiny_st (tool for interactive spatial cropping)
+
+An interactive Shiny app for manually annotating, cropping, and labeling spatial transcriptomics spots with a tissue image as background.
+
+## Function signature
+
+```r
+seurat_result <- shiny_st(
+  seurat,                  # Seurat object (required)
+  assay      = "SCT",      # Assay to use for gene expression query
+  slot       = "data",     # Slot to use ("data", "counts", "scale.data")
+  image      = NULL,       # Name of the image in seurat@images (required, e.g. "sample1")
+  python_env = NULL,       # Path to Python executable for AI filtering (optional)
+  script     = NULL,       # Path to filter_pixel_AI.py for AI filtering (optional)
+  tooltip    = NULL        # meta.data column name to show as tooltip on hover (optional)
+)
 ```
-shiny_st(seurat_obj, assay = "SCT", slot = "data", image = "test", python_env = "~/miniconda3/envs/daily/bin/python", script = "~/script/filter_pixel_AI.py")
+
+> **Return value**: a modified Seurat object. The app runs in the foreground — assign the result after quitting.
+
+## Quick start
+
+```r
+library(SP.toolbox)
+
+# Check the image name in your Seurat object
+Images(seurat_obj)
+# [1] "sample1"
+
+# Launch the app and save the result
+seurat_obj <- shiny_st(seurat_obj, assay = "SCT", slot = "data", image = "sample1")
 ```
+
+## Step-by-step workflow
+
+### Step 1 — Launch and verify the background image
+
+After calling `shiny_st()`, a browser window opens showing the tissue H&E image with spots overlaid.
+The sidebar on the left contains all controls.
+
+### Step 2 — Color spots by feature or gene
+
+| Control | Description |
+|---|---|
+| **Select feature** | Color spots by any `meta.data` column (e.g. `orig.ident`, `seurat_clusters`, `celltype`) |
+| **Select shape** | Switch between square (`22`) and circle (`21`) spot shapes |
+| **Gene input + √** | Type a gene name and click √ to color spots by its expression level |
+
+### Step 3 — Align the tissue image (if spots are misaligned)
+
+Use the image alignment controls in the sidebar to register spots onto the tissue:
+
+| Control | Range | Description |
+|---|---|---|
+| **Flip by vertical** | — | Mirror spots top ↔ bottom |
+| **Flip by horizontal** | — | Mirror spots left ↔ right |
+| **Rotate by angle + √** | −360 to 360 | Rotate all spots around the center |
+| **Move spots horizontally + √** | −96 to 96 | Shift all spots left / right |
+| **Move spots vertically + √** | −96 to 96 | Shift all spots up / down |
+| **Shrink spots horizontally + √** | 0 to 5 | Scale spot positions along the x-axis |
+| **Shrink spots vertically + √** | 0 to 5 | Scale spot positions along the y-axis |
+
+### Step 4 — Adjust spot appearance
+
+| Control | Range | Description |
+|---|---|---|
+| **Spot.alpha** | 0–1 | Spot transparency (0 = invisible, 1 = fully opaque) |
+| **Spot.size** | 0–1 | Spot rendering size |
+
+### Step 5 — Subset spots (optional)
+
+Use **Select feature to subset** + the text input to display only certain groups before lasso selection.
+Type comma-separated values (e.g. `typeA,typeB`) and click **Select**.
+Click **Back to all celltypes!** to restore all spots.
+
+### Step 6 — Lasso select and label spots
+
+1. Click the **lasso** icon in the top-right toolbar of the plot panel.
+2. Draw a freehand boundary around the spots to annotate.
+3. In **Set label for selected spots**, type a label (e.g. `tumor_region`).
+4. Click **Confirm** — the label is written to the currently selected feature column.
+5. Repeat Steps 1–4 for additional regions or labels.
+
+> Tip: set **Select feature** to the column you are annotating so newly labeled spots change color immediately.
+
+### Step 7 — (Optional) AI-based tissue filtering
+
+Requires `python_env` and `script` to be provided at launch:
+
+```r
+seurat_obj <- shiny_st(
+  seurat_obj,
+  image      = "sample1",
+  python_env = "~/miniconda3/envs/daily/bin/python",
+  script     = "~/Biosoftwares/SP_toolbox/filter_pixel_AI.py"
+)
+```
+
+In the app:
+1. Adjust the **threshold** slider (0–100) to control filtering sensitivity.
+2. Click **Power BY AI** — background spots are labeled `filtered`, tissue spots are labeled `exist` in a new column `ai.filter`.
+3. Set **Filter mode** to `on` to switch spots to outline-only display for easier checking.
+
+### Step 8 — Zoom and download
+
+The toolbar in the top-right corner of the plot provides:
+
+| Button | Function |
+|---|---|
+| **lasso** | Freehand spot selection mode |
+| **zoom** | Zoom into a rectangular region |
+| **recover** | Reset zoom to full view |
+| **download png** | Save the current plot view as a PNG file |
+
+### Step 9 — Quit and save
+
+Click **Quit** in the sidebar. The app closes and returns the modified Seurat object with:
+
+- All **Confirm**-ed labels written back into the corresponding `meta.data` column.
+- An `ai.filter` column (`exist` / `filtered`) if AI filtering was used.
+
+```r
+# Inspect annotations after quitting
+table(seurat_obj$orig.ident)
+table(seurat_obj$ai.filter)   # only if AI filtering was run
+
+# Save
+saveRDS(seurat_obj, "seurat_annotated.rds")
+```
+
+## Full example
+
+```r
+library(SP.toolbox)
+
+seurat_obj <- shiny_st(
+  seurat_obj,
+  assay      = "SCT",
+  slot       = "data",
+  image      = "sample1",
+  python_env = "~/miniconda3/envs/daily/bin/python",
+  script     = "~/Biosoftwares/SP_toolbox/filter_pixel_AI.py",
+  tooltip    = "celltype"    # show celltype label on hover
+)
+
+saveRDS(seurat_obj, "seurat_annotated.rds")
+```
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Background image not showing | ggplot2 ≥ 4.0 breaking change | Update: `devtools::install_github("EddieLv/SP_toolbox")` |
+| Spots misaligned with image | Seurat ≥ 5.0 coordinate scaling change | Same — update the package |
+| `Please set image!` error | `image` argument missing or wrong name | Run `Images(seurat_obj)` to get the exact name |
+| AI button has no effect | Wrong `python_env` or `script` path | Verify both paths exist and the Python env has required packages |
+
 ![image](https://github.com/EddieLv/STvis/assets/61786787/0a7e13cf-8ee4-44d6-9dbb-63c5150bce96)
 
 # 2. ST Neighboring Chat (tool for spatial cell-cell communication based on neighboring method)
