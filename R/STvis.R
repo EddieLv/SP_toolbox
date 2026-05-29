@@ -195,26 +195,39 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
   
   add_image = function (seurat) {
     image = Images(seurat)[1]
-    # Seurat v5 GetTissueCoordinates 默认已按 lowres 缩放，用 scale=NULL 取原始坐标避免二次缩放
-    coordinates = if (utils::packageVersion("Seurat") >= "5.0.0") {
-      GetTissueCoordinates(seurat, image = image, scale = NULL)[, 1:2]
+    img_obj = seurat@images[[image]]
+    img = img_obj@image
+
+    # VisiumV2 (Seurat v5): base coords are full-resolution pixel space;
+    #   stored image is at hires scale -> use scale="hires", no further scaling needed.
+    # VisiumV1 (Seurat v5): scale=NULL returns raw grid coords;
+    #   multiply by lowres to reach lowres image pixel space.
+    # VisiumV1 (Seurat v4): default already returns raw grid coords; same manual scaling.
+    if (inherits(img_obj, "VisiumV2")) {
+      coordinates = GetTissueCoordinates(seurat, image = image, scale = "hires")[, 1:2]
+      colnames(coordinates) = c("x", "y")
+    } else if (utils::packageVersion("Seurat") >= "5.0.0") {
+      coordinates = GetTissueCoordinates(seurat, image = image, scale = NULL)[, 1:2]
+      colnames(coordinates) = c("x", "y")
+      coordinates = coordinates %>%
+        mutate(x = x * img_obj@scale.factors$lowres,
+               y = y * img_obj@scale.factors$lowres)
     } else {
-      GetTissueCoordinates(seurat, image = image)[, 1:2]
+      coordinates = GetTissueCoordinates(seurat, image = image)[, 1:2]
+      colnames(coordinates) = c("x", "y")
+      coordinates = coordinates %>%
+        mutate(x = x * img_obj@scale.factors$lowres,
+               y = y * img_obj@scale.factors$lowres)
     }
-    colnames(coordinates) = c("x", "y")
-    coordinates = coordinates %>%
-      mutate(x = x * seurat@images[[image]]@scale.factors$lowres,
-             y = y * seurat@images[[image]]@scale.factors$lowres)
     #
     coordinates = rotate.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB_stvis) > 50, 96, 50), angle = 90)
     coordinates = flip.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB_stvis) > 50, 96, 50), horizontal = T)
     coordinates$id_stvis = seurat$id_stvis
-    
-    img = seurat@images[[image]]@image
+
     img_grob = grid::rasterGrob(img, interpolate = FALSE, width = grid::unit(1, "npc"), height = grid::unit(1, "npc"))
     # ggplot2 v4.0+ 严格按数据范围裁剪 annotation_custom，ymax 必须为正值才在 ylim(nrow,0) 范围内
     annotation = annotation_custom(grob = img_grob, xmin = 0, xmax = ncol(img), ymin = 0, ymax = nrow(img))
-    
+
     return(list(annotation, coordinates, img))
   }
   
