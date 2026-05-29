@@ -195,8 +195,12 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
   
   add_image = function (seurat) {
     image = Images(seurat)[1]
-    # 暂时解决方案
-    coordinates = GetTissueCoordinates(seurat, image = image)[, 1:2]
+    # Seurat v5 GetTissueCoordinates 默认已按 lowres 缩放，用 scale=NULL 取原始坐标避免二次缩放
+    coordinates = if (utils::packageVersion("Seurat") >= "5.0.0") {
+      GetTissueCoordinates(seurat, image = image, scale = NULL)[, 1:2]
+    } else {
+      GetTissueCoordinates(seurat, image = image)[, 1:2]
+    }
     colnames(coordinates) = c("x", "y")
     coordinates = coordinates %>%
       mutate(x = x * seurat@images[[image]]@scale.factors$lowres,
@@ -208,7 +212,8 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     
     img = seurat@images[[image]]@image
     img_grob = grid::rasterGrob(img, interpolate = FALSE, width = grid::unit(1, "npc"), height = grid::unit(1, "npc"))
-    annotation = annotation_custom(grob = img_grob, xmin = 0, xmax = ncol(img), ymin = 0, ymax = -nrow(img))
+    # ggplot2 v4.0+ 严格按数据范围裁剪 annotation_custom，ymax 必须为正值才在 ylim(nrow,0) 范围内
+    annotation = annotation_custom(grob = img_grob, xmin = 0, xmax = ncol(img), ymin = 0, ymax = nrow(img))
     
     return(list(annotation, coordinates, img))
   }
