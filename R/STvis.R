@@ -193,36 +193,53 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     return(p)
   }
   
+  # Pick the scale factor (hires/lowres) whose scaled coords best fit the stored image.
+  # The stored @image resolution varies by loading pipeline: standard Visium often keeps
+  # the hires image, Visium HD often keeps the lowres image. Hardcoding one mis-scales the
+  # other (e.g. HD with hires pushes spots ~10x off-canvas, so no spots are visible).
+  pick.scale.shiny = function(img_obj, max.x, max.y) {
+    img = img_obj@image
+    iw = ncol(img); ih = nrow(img)
+    sfs = img_obj@scale.factors
+    cand = c("hires", "lowres")
+    score = sapply(cand, function(s) {
+      fill = max(max.x * sfs[[s]] / iw, max.y * sfs[[s]] / ih)
+      if (fill > 1.05) (fill - 1) * 1000 else (1 - fill)  # penalise overflow, prefer best fill
+    })
+    sfs[[ cand[which.min(score)] ]]
+  }
+
   add_image = function (seurat) {
     image = Images(seurat)[1]
     img_obj = seurat@images[[image]]
     img = img_obj@image
 
-    # VisiumV2 (Seurat v5): base coords are full-resolution pixel space;
-    #   stored image is at hires scale -> use scale="hires", no further scaling needed.
-    # VisiumV1 (Seurat v5): scale=NULL returns raw grid coords;
-    #   multiply by lowres to reach lowres image pixel space.
-    # VisiumV1 (Seurat v4): default already returns raw grid coords; same manual scaling.
     if (inherits(img_obj, "VisiumV2")) {
-      coordinates = GetTissueCoordinates(seurat, image = image, scale = "hires")[, 1:2]
-      colnames(coordinates) = c("x", "y")
-    } else if (utils::packageVersion("Seurat") >= "5.0.0") {
+      # VisiumV2 (Seurat v5): coords are full-resolution pixel space (x = column, y = row).
+      # Scale to the stored image and map directly to the plot axes (no rotate/flip): this
+      # aligns spots to the image for both square (Visium) and rectangular (HD) tissues.
       coordinates = GetTissueCoordinates(seurat, image = image, scale = NULL)[, 1:2]
       colnames(coordinates) = c("x", "y")
-      coordinates = coordinates %>%
-        mutate(x = x * img_obj@scale.factors$lowres,
-               y = y * img_obj@scale.factors$lowres)
+      sf = pick.scale.shiny(img_obj, max(coordinates$x), max(coordinates$y))
+      coordinates$x = coordinates$x * sf
+      coordinates$y = coordinates$y * sf
+      coordinates$id_stvis = seurat$id_stvis
     } else {
-      coordinates = GetTissueCoordinates(seurat, image = image)[, 1:2]
+      # VisiumV1 (legacy DBIT-seq / Seurat v4): raw grid coords scaled by lowres, then
+      # transposed (rotate 90 + flip horizontal) to match the image orientation.
+      if (utils::packageVersion("Seurat") >= "5.0.0") {
+        coordinates = GetTissueCoordinates(seurat, image = image, scale = NULL)[, 1:2]
+      } else {
+        coordinates = GetTissueCoordinates(seurat, image = image)[, 1:2]
+      }
       colnames(coordinates) = c("x", "y")
       coordinates = coordinates %>%
         mutate(x = x * img_obj@scale.factors$lowres,
                y = y * img_obj@scale.factors$lowres)
+      coordinates = rotate.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB_stvis) > 50, 96, 50), angle = 90)
+      coordinates = flip.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB_stvis) > 50, 96, 50), horizontal = T)
+      coordinates$id_stvis = seurat$id_stvis
     }
-    #
-    coordinates = rotate.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB_stvis) > 50, 96, 50), angle = 90)
-    coordinates = flip.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB_stvis) > 50, 96, 50), horizontal = T)
-    coordinates$id_stvis = seurat$id_stvis
 
     img_grob = grid::rasterGrob(img, interpolate = FALSE, width = grid::unit(1, "npc"), height = grid::unit(1, "npc"))
     # ggplot2 v4.0+ 严格按数据范围裁剪 annotation_custom，ymax 必须为正值才在 ylim(nrow,0) 范围内
