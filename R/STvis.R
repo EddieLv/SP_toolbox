@@ -141,6 +141,21 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
                coordinates = tissue.positions, spot.radius = spot.radius))
   }
   
+  # Build at least n highly-distinct categorical colors. Combines several curated
+  # Seurat DiscretePalette sets (~96 distinct) and, if more categories exist, extends
+  # with evenly-spaced HCL hues so any number of labels gets a unique color (>=100 ok).
+  discrete.palette.shiny = function(n) {
+    base = unique(c(
+      Seurat::DiscretePalette(36, palette = "polychrome", shuffle = FALSE),
+      Seurat::DiscretePalette(32, palette = "glasbey",    shuffle = FALSE),
+      Seurat::DiscretePalette(26, palette = "alphabet",   shuffle = FALSE),
+      Seurat::DiscretePalette(26, palette = "alphabet2",  shuffle = FALSE)
+    ))
+    if (n <= length(base)) return(base[seq_len(n)])
+    extra = grDevices::hcl(h = seq(15, 375, length.out = n - length(base) + 1)[-1], c = 100, l = 65)
+    c(base, extra)
+  }
+
   make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.size = 0.1, shape = 22, show.feature = NULL, mode = NULL, tooltip = tooltip) {
     annotation = ann[[1]]
     coordinates = ann[[2]]
@@ -170,9 +185,8 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
         guides(alpha = "none") +
         labs(fill = show.feature)
     } else {
-      cols = c("#F6222EFF", "#5A5156FF", "#FE00FAFF", "#16FF32FF", "#3283FEFF", "#FEAF16FF", "#B00068FF", "#1CFFCEFF", "#90AD1CFF", "#2ED9FFFF", "#DEA0FDFF", "#AA0DFEFF",
-               "#F8A19FFF", "#325A9BFF", "#C4451CFF", "#1C8356FF", "#85660DFF", "#B10DA1FF", "#FBE426FF", "#1CBE4FFF", "#FA0087FF", "#FC1CBFFF", "#F7E1A0FF", "#C075A6FF", "#782AB6FF",
-               "#AAF400FF", "#BDCDFFFF", "#822E1CFF", "#B5EFB5FF", "#7ED7D1FF", "#1C7F93FF", "#D85FF7FF", "#683B79FF", "#66B0FFFF", "#3B00FBFF")
+      n.cat = length(unique(stats::na.omit(as.character(coordinates$feature))))
+      cols = discrete.palette.shiny(max(n.cat, 1L))
             
       # only for AI filtering
       if (mode == "on") {
