@@ -18,7 +18,7 @@ library(ggplot2)
 library(viridis)
 library(grid)
 
-shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_env = NULL, script = NULL, tooltip = NULL) {
+shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_env = NULL, script = NULL, tooltip = NULL, crop = TRUE) {
   DefaultAssay(seurat) = assay
   
   move.axis.shiny = function(df, x = NULL, y = NULL, numBarcode = NULL, x.num = 0, y.num = 0) {
@@ -156,11 +156,43 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     c(base, extra)
   }
 
+  crop.limits.shiny = function(coordinates, img, crop = TRUE) {
+    if (!isTRUE(crop)) {
+      return(list(x = c(0, ncol(img)), y = c(0, nrow(img))))
+    }
+
+    padded.range = function(values, image.extent) {
+      values = values[is.finite(values)]
+      if (length(values) == 0) {
+        return(c(0, image.extent))
+      }
+
+      limits = range(values)
+      # Match SpatialPlot(crop = TRUE): frame the spots rather than the full slide,
+      # while retaining a small amount of tissue around the outermost spots.
+      padding = max(diff(limits) * 0.05, image.extent * 0.005, 1)
+      limits = c(limits[1] - padding, limits[2] + padding)
+      c(max(0, limits[1]), min(image.extent, limits[2]))
+    }
+
+    list(
+      x = padded.range(coordinates$x, ncol(img)),
+      y = padded.range(coordinates$y, nrow(img))
+    )
+  }
+
   make.feature.plot.shiny = function(ann = NULL, anno.df = NULL, alpha = 0.8, pt.size = 0.1, shape = 22, show.feature = NULL, mode = NULL, tooltip = tooltip) {
     annotation = ann[[1]]
     coordinates = ann[[2]]
     img = ann[[3]]
-    coordinates = coordinates[anno.df$barcode, ]
+    coordinate.index = match(anno.df$barcode, rownames(coordinates))
+    keep = !is.na(coordinate.index)
+    coordinates = coordinates[coordinate.index[keep], , drop = FALSE]
+    anno.df = anno.df[keep, , drop = FALSE]
+    if (nrow(coordinates) == 0) {
+      stop("No cells in the current Seurat object have coordinates in image '", image, "'.")
+    }
+    plot.limits = crop.limits.shiny(coordinates, img, crop = ann[[4]])
     if (is.factor(anno.df[[show.feature]])) {
       coordinates$feature = droplevels(anno.df[[show.feature]])
     } else {
@@ -179,9 +211,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
         geom_point_interactive(aes(fill = feature, alpha = feature), size = pt.size, shape = shape, stroke = NA, color = "black") +
         scale_fill_gradientn(colors = cols) +
         scale_alpha(range = c(alpha, 1)) +
-        ylim(nrow(img), 0) + xlim(0, ncol(img)) +
+        ylim(plot.limits$y[2], plot.limits$y[1]) + xlim(plot.limits$x[1], plot.limits$x[2]) +
         theme_void() + coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = F, clip = "on") +
-        theme(aspect.ratio = 1, legend.position = "top", plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
+        theme(legend.position = "top", plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
         guides(alpha = "none") +
         labs(fill = show.feature)
     } else {
@@ -196,9 +228,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
       p = ggplot(coordinates, aes_string(x = "x", y = "y", data_id = "id_stvis", tooltip = ifelse(is.null(tooltip), "feature", "tooltip"))) + 
         annotation +
         geom_point_interactive(aes(fill = feature), size = pt.size, shape = shape, stroke = 0.1, alpha = alpha, color = "black") +
-        ylim(nrow(img), 0) + xlim(0, ncol(img)) +
+        ylim(plot.limits$y[2], plot.limits$y[1]) + xlim(plot.limits$x[1], plot.limits$x[2]) +
         theme_void() + coord_fixed(ratio = 1, xlim = NULL, ylim = NULL, expand = F, clip = "on") +
-        theme(aspect.ratio = 1, legend.spacing.y = unit(0, "cm"), plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
+        theme(legend.spacing.y = unit(0, "cm"), plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
         scale_fill_manual_interactive(values = cols) +
         guides(alpha = "none", fill = guide_legend(ncol = 1, byrow = T, override.aes = list(size = 5))) +
         labs(fill = show.feature)
@@ -223,43 +255,46 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     sfs[[ cand[which.min(score)] ]]
   }
 
-  add_image = function (seurat) {
-    image = Images(seurat)[1]
-    img_obj = seurat@images[[image]]
+  add_image = function (seurat, image.name, crop = TRUE) {
+    img_obj = seurat@images[[image.name]]
     img = img_obj@image
 
     if (inherits(img_obj, "VisiumV2")) {
       # VisiumV2 (Seurat v5): coords are full-resolution pixel space (x = column, y = row).
       # Scale to the stored image and map directly to the plot axes (no rotate/flip): this
       # aligns spots to the image for both square (Visium) and rectangular (HD) tissues.
-      coordinates = GetTissueCoordinates(seurat, image = image, scale = NULL)[, 1:2]
+      coordinates = GetTissueCoordinates(seurat, image = image.name, scale = NULL)[, 1:2]
+      cells.use = intersect(colnames(seurat), rownames(coordinates))
+      coordinates = coordinates[cells.use, , drop = FALSE]
       colnames(coordinates) = c("x", "y")
       sf = pick.scale.shiny(img_obj, max(coordinates$x), max(coordinates$y))
       coordinates$x = coordinates$x * sf
       coordinates$y = coordinates$y * sf
-      coordinates$id_stvis = seurat$id_stvis
+      coordinates$id_stvis = seurat@meta.data[rownames(coordinates), "id_stvis"]
     } else {
       # VisiumV1 (legacy DBIT-seq / Seurat v4): raw grid coords scaled by lowres, then
       # transposed (rotate 90 + flip horizontal) to match the image orientation.
       if (utils::packageVersion("Seurat") >= "5.0.0") {
-        coordinates = GetTissueCoordinates(seurat, image = image, scale = NULL)[, 1:2]
+        coordinates = GetTissueCoordinates(seurat, image = image.name, scale = NULL)[, 1:2]
       } else {
-        coordinates = GetTissueCoordinates(seurat, image = image)[, 1:2]
+        coordinates = GetTissueCoordinates(seurat, image = image.name)[, 1:2]
       }
+      cells.use = intersect(colnames(seurat), rownames(coordinates))
+      coordinates = coordinates[cells.use, , drop = FALSE]
       colnames(coordinates) = c("x", "y")
       coordinates = coordinates %>%
         mutate(x = x * img_obj@scale.factors$lowres,
                y = y * img_obj@scale.factors$lowres)
       coordinates = rotate.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB_stvis) > 50, 96, 50), angle = 90)
       coordinates = flip.axis.shiny(coordinates, x = "x", y = "y", numBarcode = ifelse(max(seurat$barcodeB_stvis) > 50, 96, 50), horizontal = T)
-      coordinates$id_stvis = seurat$id_stvis
+      coordinates$id_stvis = seurat@meta.data[rownames(coordinates), "id_stvis"]
     }
 
     img_grob = grid::rasterGrob(img, interpolate = FALSE, width = grid::unit(1, "npc"), height = grid::unit(1, "npc"))
     # ggplot2 v4.0+ 严格按数据范围裁剪 annotation_custom，ymax 必须为正值才在 ylim(nrow,0) 范围内
     annotation = annotation_custom(grob = img_grob, xmin = 0, xmax = ncol(img), ymin = 0, ymax = nrow(img))
 
-    return(list(annotation, coordinates, img))
+    return(list(annotation, coordinates, img, crop))
   }
   
   ai.filter = function(image = NULL, df = NULL, python_env = NULL, script = NULL, barcodeNum = NULL, thre = NULL, prefix = NULL) {
@@ -389,11 +424,23 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     if (is.null(image)) {
       stop("Please set image!")
     }
-    
-    if (length(Images(seurat)) > 1) {
-      message(paste("Detect", length(Images(seurat)), "images!"))
+
+    if (!image %in% Images(seurat)) {
+      stop("Image '", image, "' was not found. Available images: ", paste(Images(seurat), collapse = ", "))
+    }
+
+    image.coordinates = GetTissueCoordinates(seurat, image = image)
+    image.cells = intersect(colnames(seurat), rownames(image.coordinates))
+    if (length(image.cells) == 0) {
+      stop("No cells in the current Seurat object have coordinates in image '", image, "'.")
+    }
+
+    if (length(Images(seurat)) > 1 || length(image.cells) < ncol(seurat)) {
+      if (length(Images(seurat)) > 1) {
+        message(paste("Detect", length(Images(seurat)), "images; using", image))
+      }
       seurat.backup = seurat
-      seurat = subset(seurat.backup, cells = rownames(GetTissueCoordinates(seurat.backup, image = image)), slot = slot)
+      seurat = subset(seurat.backup, cells = image.cells, slot = slot)
       seurat@meta.data = seurat@meta.data[ , colnames(seurat.backup@meta.data)]
       img = list(seurat@images[[image]]); names(img) = image
       seurat@images = img
@@ -412,7 +459,9 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     # }
     
     # clean.barcodes = str_match(colnames(seurat), pattern = "\\d+x\\d+")[ , 1]
-    clean.barcodes = paste0(GetTissueCoordinates(seurat, image = image)[, 1], "x", GetTissueCoordinates(seurat, image = image)[, 2])
+    image.coordinates = GetTissueCoordinates(seurat, image = image)
+    image.coordinates = image.coordinates[rownames(seurat@meta.data), , drop = FALSE]
+    clean.barcodes = paste0(image.coordinates[, 1], "x", image.coordinates[, 2])
     # prefix = gsub(clean.barcodes[1], "", colnames(seurat)[1])
     prefix = seurat$orig.ident[1]
     # add important feature!
@@ -442,7 +491,7 @@ shiny_st = function(seurat, assay = "SCT", slot = "data", image = NULL, python_e
     rv = reactiveValues(sNr = "1", ann = NULL)
     observeEvent(input$sampleInput, {
       rv$sNr = sampleChoice[1]
-      rv$ann = add_image(seurat)
+      rv$ann = add_image(seurat, image.name = image, crop = crop)
     })
     
     observeEvent(input$gene.ok, {

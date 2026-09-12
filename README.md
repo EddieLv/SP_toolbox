@@ -27,7 +27,8 @@ seurat_result <- shiny_st(
   image      = NULL,       # Name of the image in seurat@images (required, e.g. "sample1")
   python_env = NULL,       # Path to Python executable for AI filtering (optional)
   script     = NULL,       # Path to filter_pixel_AI.py for AI filtering (optional)
-  tooltip    = NULL        # meta.data column name to show as tooltip on hover (optional)
+  tooltip    = NULL,       # meta.data column name to show as tooltip on hover (optional)
+  crop       = TRUE        # Crop the view to cells retained in the object
 )
 ```
 
@@ -45,6 +46,17 @@ Images(seurat_obj)
 # Launch the app and save the result
 seurat_obj <- shiny_st(seurat_obj, assay = "SCT", slot = "data", image = "sample1")
 ```
+
+For a slide containing several tissues, subset the cells first. With the default
+`crop = TRUE`, `shiny_st()` frames only the retained tissue, matching the behavior
+of `SpatialPlot(crop = TRUE)`:
+
+```r
+one_tissue <- subset(seurat_obj, cells = cells_from_one_tissue)
+one_tissue <- shiny_st(one_tissue, image = "sample1", crop = TRUE)
+```
+
+Set `crop = FALSE` to keep showing the complete slide image.
 
 ## Step-by-step workflow
 
